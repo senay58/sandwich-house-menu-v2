@@ -1244,6 +1244,17 @@ export async function fetchMenuCloud(): Promise<MenuData | null> {
   }
 }
 
+export async function testConnectionCloud(): Promise<{ success: boolean; message: string }> {
+  try {
+    const { error } = await withTimeout(supabase.from("categories").select("id").limit(1), 5000);
+    if (error) return { success: false, message: error.message };
+    return { success: true, message: "Connected successfully!" };
+  } catch (err: any) {
+    return { success: false, message: err.message || "Unknown Network Error" };
+  }
+}
+
+
 export async function saveMenuCloud(data: MenuData) {
   try {
     // 1. Prepare Categories
