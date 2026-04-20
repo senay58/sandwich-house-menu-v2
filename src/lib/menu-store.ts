@@ -1428,9 +1428,20 @@ export function useMenu(): {
   const update = async (next: MenuData) => {
     setData(next);
     saveMenuLocal(next);
-    const success = await saveMenuCloud(next);
-    if (!success) setCloudStatus("offline");
-    else setCloudStatus("online");
+    
+    // Attempt cloud save
+    try {
+      const success = await saveMenuCloud(next);
+      if (success) {
+        setCloudStatus("online");
+      } else {
+        // If it fails but doesn't throw (e.g. timeout returned false)
+        setCloudStatus("offline");
+      }
+    } catch (err) {
+      console.warn("Update cloud sync failed:", err);
+      setCloudStatus("offline");
+    }
   };
 
   const migrateToCloud = async () => {

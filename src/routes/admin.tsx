@@ -247,8 +247,13 @@ function AdminPage() {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (parsed.categories && parsed.items) {
-          await update(parsed);
-          alert("Database Restored Successfully!");
+          setIsSyncing(true);
+          try {
+            await update(parsed);
+            alert("Database Restored Successfully!");
+          } finally {
+            setIsSyncing(false);
+          }
         } else {
           alert("Invalid backup file structure.");
         }
