@@ -534,7 +534,8 @@ function AdminPage() {
 
         <div className="max-w-5xl">
           {activeTab === "settings" && (
-            <div className="space-y-8               <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/30 p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+               <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/30 p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
                   <div className="rounded-full bg-blue-500/10 p-4 text-blue-500">
                     <Cloud className="h-6 w-6" />
@@ -584,8 +585,6 @@ function AdminPage() {
                     Download Backup
                   </button>
                 </div>
-              </section> </button>
-                </div>
               </section>
 
               <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/30 p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
@@ -596,6 +595,7 @@ function AdminPage() {
                   <div>
                     <h3 className="font-serif text-xl font-bold text-foreground">Straight Entry</h3>
                     <p className="text-sm font-medium text-muted-foreground mt-1 max-w-sm">
+
                       Enable automatic login on this device. You won't be asked for a passcode when returning.
                     </p>
                   </div>
