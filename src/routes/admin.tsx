@@ -7,7 +7,7 @@ import {
   uid,
   useMenu,
 } from "@/lib/menu-store";
-import { Plus, ChevronUp, ChevronDown, Edit2, Trash2, ArrowLeft, Settings2, Image as ImageIcon, UploadCloud, QrCode, Download, Database, CloudDownload, CloudUpload, EyeOff, LayoutDashboard, Tag, Coffee, Settings, LogOut } from "lucide-react";
+import { Plus, ChevronUp, ChevronDown, Edit2, Trash2, ArrowLeft, Settings2, Image as ImageIcon, UploadCloud, QrCode, Download, Database, CloudDownload, CloudUpload, EyeOff, LayoutDashboard, Tag, Coffee, Settings, LogOut, Menu, X } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -42,6 +42,8 @@ function AdminPage() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [editingCat, setEditingCat] = useState<Category | null>(null);
   const [showQR, setShowQR] = useState(false);
+  const [activeTab, setActiveTab] = useState<"items" | "categories" | "settings">("items");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogin = (e: React.FormEvent) => {
@@ -68,8 +70,6 @@ function AdminPage() {
     setIsAuthenticated(false);
     localStorage.removeItem("sandwich_house_admin_auth");
   };
-
-  const [activeTab, setActiveTab] = useState<"items" | "categories" | "settings">("items");
 
   // ── Categories ──
   const addCategory = () => setEditingCat({ id: uid("cat"), name: "", parentId: undefined });
@@ -262,23 +262,44 @@ function AdminPage() {
   return (
     <div className="flex min-h-screen bg-background text-foreground font-sans selection:bg-primary/20">
       
+      {/* ── Mobile Sidebar Backdrop ── */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden animate-in fade-in duration-300"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* ── Sidebar ── */}
-      <aside className="sticky top-0 z-40 hidden h-screen w-64 shrink-0 flex-col border-r border-border/40 bg-card/60 backdrop-blur-2xl md:flex">
-        <div className="flex items-center gap-3 p-6">
-          <div className="rounded-xl border border-border/50 bg-white p-1.5 shadow-sm">
-            <img src="/logo.png" alt="logo" className="h-8 w-8 object-contain" />
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-border/40 bg-card/90 backdrop-blur-2xl transition-transform duration-300 md:sticky md:top-0 md:h-screen md:translate-x-0 md:bg-card/60 ${
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+      }`}>
+        <div className="flex items-center justify-between p-6">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl border border-border/50 bg-white p-1.5 shadow-sm">
+              <img src="/logo.png" alt="logo" className="h-8 w-8 object-contain" />
+            </div>
+            <div>
+              <h1 className="font-serif text-sm font-bold tracking-tight text-foreground uppercase">
+                Sandwich House
+              </h1>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Admin Domain</p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-serif text-sm font-bold tracking-tight text-foreground uppercase">
-              Sandwich House
-            </h1>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Admin Domain</p>
-          </div>
+          <button 
+            onClick={() => setIsSidebarOpen(false)}
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary md:hidden"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
         
         <nav className="flex-1 space-y-2 px-4 mt-2">
           <button
-            onClick={() => setActiveTab("items")}
+            onClick={() => {
+              setActiveTab("items");
+              setIsSidebarOpen(false);
+            }}
             className={`flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-bold transition-all ${
               activeTab === "items"
                 ? "bg-foreground text-background shadow-lg shadow-foreground/10"
@@ -290,7 +311,10 @@ function AdminPage() {
           </button>
           
           <button
-            onClick={() => setActiveTab("categories")}
+            onClick={() => {
+              setActiveTab("categories");
+              setIsSidebarOpen(false);
+            }}
             className={`flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-bold transition-all ${
               activeTab === "categories"
                 ? "bg-foreground text-background shadow-lg shadow-foreground/10"
@@ -302,7 +326,10 @@ function AdminPage() {
           </button>
           
           <button
-            onClick={() => setActiveTab("settings")}
+            onClick={() => {
+              setActiveTab("settings");
+              setIsSidebarOpen(false);
+            }}
             className={`flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-sm font-bold transition-all ${
               activeTab === "settings"
                 ? "bg-foreground text-background shadow-lg shadow-foreground/10"
@@ -334,8 +361,30 @@ function AdminPage() {
 
       {/* ── Main Content ── */}
       <main className="flex-1 px-4 py-8 md:p-8 lg:p-12 animate-in fade-in duration-700 max-w-full overflow-x-hidden">
+        {/* Mobile Header Toggle */}
+        <div className="mb-6 flex items-center justify-between md:hidden">
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="rounded-xl border border-border/60 bg-card/80 p-2.5 text-foreground shadow-sm backdrop-blur-md transition-all active:scale-95 flex items-center justify-center"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg border border-border/50 bg-white p-1 shadow-sm">
+              <img src="/logo.png" alt="logo" className="h-6 w-6 object-contain" />
+            </div>
+            <span className="font-serif text-xs font-bold uppercase tracking-tight">Admin Portal</span>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="rounded-xl bg-destructive/10 p-2.5 text-destructive transition-all active:scale-95"
+          >
+            <LogOut className="h-5 w-5" />
+          </button>
+        </div>
+
         <header className="mb-10 flex items-center justify-between border-b border-border/50 pb-6">
-          <h2 className="font-serif text-3xl font-bold tracking-tight text-foreground">
+          <h2 className="font-serif text-xl sm:text-3xl font-bold tracking-tight text-foreground">
             {activeTab === "items" && "Menu Items"}
             {activeTab === "categories" && "Categories Engine"}
             {activeTab === "settings" && "System Settings"}
