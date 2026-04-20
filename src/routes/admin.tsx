@@ -7,7 +7,8 @@ import {
   uid,
   useMenu,
 } from "@/lib/menu-store";
-import { Plus, ChevronUp, ChevronDown, Edit2, Trash2, ArrowLeft, Settings2, Image as ImageIcon, UploadCloud, QrCode, Download, Database, CloudDownload, CloudUpload, EyeOff, LayoutDashboard, Tag, Coffee, Settings, LogOut, Menu, X } from "lucide-react";
+import { Plus, ChevronUp, ChevronDown, Edit2, Trash2, ArrowLeft, Settings2, Image as ImageIcon, UploadCloud, QrCode, Download, Database, CloudDownload, CloudUpload, EyeOff, LayoutDashboard, Tag, Coffee, Settings, LogOut, Menu, X, ShieldCheck, Key, Lock, Check } from "lucide-react";
+import { compressImage } from "@/lib/menu-store";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -34,10 +35,19 @@ function AdminPage() {
 
   const [currentPasscode, setCurrentPasscode] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("sandwich_house_admin_passcode") || "admin123";
+      return localStorage.getItem("sandwich_house_admin_passcode") || "";
     }
-    return "admin123";
+    return "";
   });
+
+  const [stayLoggedIn, setStayLoggedIn] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("sandwich_house_admin_stay_logged_in") === "true";
+    }
+    return false;
+  });
+
+  const isFirstTime = !currentPasscode;
   
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [editingCat, setEditingCat] = useState<Category | null>(null);
@@ -48,7 +58,12 @@ function AdminPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passcode === currentPasscode || passcode === "sandwich") {
+    if (!currentPasscode) {
+      // First time setup - this shouldn't happen here but as a fallback
+      alert("Please set a passcode in the setup screen first.");
+      return;
+    }
+    if (passcode === currentPasscode) {
       setIsAuthenticated(true);
       localStorage.setItem("sandwich_house_admin_auth", "true");
       setLoginError(false);
@@ -58,12 +73,29 @@ function AdminPage() {
     }
   };
 
+  const handleInitialSetup = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPasscode.trim()) return;
+    setCurrentPasscode(newPasscode);
+    localStorage.setItem("sandwich_house_admin_passcode", newPasscode);
+    setIsAuthenticated(true);
+    localStorage.setItem("sandwich_house_admin_auth", "true");
+    setNewPasscode("");
+    alert("Passcode set successfully! Welcome to your Admin dashboard.");
+  };
+
   const handleUpdatePasscode = () => {
     if (!newPasscode.trim()) return;
     setCurrentPasscode(newPasscode);
     localStorage.setItem("sandwich_house_admin_passcode", newPasscode);
     setNewPasscode("");
     alert("Passcode updated successfully!");
+  };
+
+  const toggleStayLoggedIn = () => {
+    const next = !stayLoggedIn;
+    setStayLoggedIn(next);
+    localStorage.setItem("sandwich_house_admin_stay_logged_in", String(next));
   };
 
   const handleLogout = () => {
@@ -206,21 +238,58 @@ function AdminPage() {
     }
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !stayLoggedIn) {
+     if (isFirstTime) {
+       return (
+         <div className="flex min-h-screen items-center justify-center bg-background px-4 font-sans selection:bg-primary/20">
+           <div className="w-full max-w-sm rounded-[2.5rem] border border-border/60 bg-card p-10 shadow-2xl animate-in fade-in zoom-in duration-700">
+             <div className="mb-8 flex flex-col items-center">
+               <div className="mb-5 rounded-[1.5rem] border-2 border-primary/20 bg-primary/5 p-4 text-primary">
+                 <ShieldCheck className="h-10 w-10" />
+               </div>
+               <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground">Welcome</h1>
+               <p className="mt-3 text-sm font-medium text-muted-foreground text-center">
+                 Create your secret admin passcode to get started. Choose something secure.
+               </p>
+             </div>
+             <form onSubmit={handleInitialSetup} className="space-y-5">
+               <div className="space-y-4">
+                 <input
+                   type="password"
+                   value={newPasscode}
+                   onChange={(e) => setNewPasscode(e.target.value)}
+                   placeholder="Create New Passcode..."
+                   className="w-full rounded-2xl border border-border/80 bg-input/40 px-5 py-4 text-sm font-bold text-foreground transition-all focus:border-primary focus:bg-card focus:outline-none focus:ring-4 focus:ring-primary/10"
+                   autoFocus
+                   required
+                 />
+               </div>
+               <button
+                 type="submit"
+                 className="flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground py-4 text-sm font-bold text-background shadow-xl transition-all hover:scale-[1.02] active:scale-95 duration-200"
+               >
+                 Activate Admin Portal
+               </button>
+             </form>
+           </div>
+         </div>
+       );
+     }
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4 font-sans selection:bg-primary/20">
-        <div className="w-full max-w-sm rounded-3xl border border-border/60 bg-card p-8 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="w-full max-w-sm rounded-[2.5rem] border border-border/60 bg-card p-10 shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="mb-8 flex flex-col items-center">
-            <div className="mb-4 rounded-2xl border border-border/50 bg-white p-3 shadow-sm">
+            <div className="mb-5 rounded-[1.5rem] border border-border/50 bg-white p-4 shadow-sm">
               <img src="/logo.png" alt="logo" className="h-12 w-12 object-contain" />
             </div>
             <h1 className="font-serif text-2xl font-bold tracking-tight text-foreground">Admin Portal</h1>
-            <p className="mt-2 text-sm text-muted-foreground text-center">
-              Please enter the passcode to access the Sandwich House admin dashboard.
+            <p className="mt-2 text-sm text-muted-foreground text-center font-medium">
+              Enter your passcode to access the dashboard.
             </p>
           </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div className="relative">
               <input
                 type="password"
                 value={passcode}
@@ -229,29 +298,29 @@ function AdminPage() {
                   setLoginError(false);
                 }}
                 placeholder="Enter Passcode..."
-                className={`w-full rounded-xl border bg-input/40 px-4 py-3 text-sm text-foreground transition-all placeholder:text-muted-foreground/50 focus:bg-card focus:outline-none focus:ring-4 font-medium ${
+                className={`w-full rounded-2xl border bg-input/40 px-5 py-4 text-sm font-bold text-foreground transition-all placeholder:text-muted-foreground/50 focus:bg-card focus:outline-none focus:ring-4 ${
                   loginError
-                    ? "border-destructive/50 focus:border-destructive focus:ring-destructive/10"
+                    ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/10"
                     : "border-border/80 focus:border-primary focus:ring-primary/10"
                 }`}
                 autoFocus
               />
               {loginError && (
-                <p className="mt-2 text-xs font-semibold text-destructive animate-in fade-in">
-                  Incorrect passcode. Please try again.
+                <p className="mt-3 text-xs font-bold text-red-500 animate-in fade-in pl-1">
+                   Passcode is incorrect. Try again.
                 </p>
               )}
             </div>
             <button
               type="submit"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-foreground py-3.5 text-sm font-bold text-background shadow-lg transition-transform hover:scale-[1.02] active:scale-95 duration-200"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground py-4 text-sm font-bold text-background shadow-xl transition-transform hover:scale-[1.02] active:scale-95 duration-200"
             >
-              Secure Login
+              Unlock Dashboard
             </button>
           </form>
-          <div className="mt-6 text-center">
-             <Link to="/" className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5">
-               <ArrowLeft className="h-3 w-3" /> Back to Menu
+          <div className="mt-8 text-center">
+             <Link to="/" className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5 uppercase tracking-widest">
+               <ArrowLeft className="h-3.5 w-3.5" /> Back to Menu
              </Link>
           </div>
         </div>
@@ -457,13 +526,37 @@ function AdminPage() {
 
               <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/30 p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
+                  <div className="rounded-full bg-primary/10 p-4 text-primary">
+                    <Key className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-serif text-xl font-bold text-foreground">Straight Entry</h3>
+                    <p className="text-sm font-medium text-muted-foreground mt-1 max-w-sm">
+                      Enable automatic login on this device. You won't be asked for a passcode when returning.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center">
+                   <button
+                    onClick={toggleStayLoggedIn}
+                    className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 outline-none focus:ring-4 focus:ring-primary/20 ${
+                      stayLoggedIn ? "bg-primary" : "bg-border"
+                    }`}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${stayLoggedIn ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+              </section>
+
+              <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/30 p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
                   <div className="rounded-full bg-destructive/10 p-4 text-destructive">
                     <Settings className="h-6 w-6" />
                   </div>
                   <div>
                     <h3 className="font-serif text-xl font-bold text-foreground">Admin Passcode</h3>
                     <p className="text-sm font-medium text-muted-foreground mt-1 max-w-sm">
-                      Change the passcode required to access the admin portal. Current default is 'admin123'.
+                      Update your secret admin passcode. Choose something secure that you won't forget.
                     </p>
                   </div>
                 </div>
@@ -796,7 +889,10 @@ function ItemDialog({ value, categories, onSave, onCancel }: any) {
     if (!file) return;
     if (!file.type.startsWith("image/")) { alert("Please upload an image file."); return; }
     const reader = new FileReader();
-    reader.onload = () => update("image", String(reader.result));
+    reader.onload = async () => {
+      const compressed = await compressImage(String(reader.result));
+      update("image", compressed);
+    };
     reader.readAsDataURL(file);
   };
 

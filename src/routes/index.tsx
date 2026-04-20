@@ -28,6 +28,8 @@ function MenuPage() {
   const navItemRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
   const [pillStyle, setPillStyle] = useState({ width: 0, left: 0, opacity: 0 });
+  const isNavigating = useRef(false);
+  const scrollTimeout = useRef<any>(null);
 
   const topCategories = useMemo(
     () => data.categories.filter((c) => !c.parentId),
@@ -101,16 +103,36 @@ function MenuPage() {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (visible) setActiveCat(visible.target.id);
+        if (isNavigating.current) return;
+        
+        const entriesInView = entries.filter((e) => e.isIntersecting);
+        if (entriesInView.length === 0) return;
+
+        // Sort by how close they are to the top of our "active" zone
+        const best = entriesInView.sort((a, b) => {
+          return Math.abs(a.boundingClientRect.top - 150) - Math.abs(b.boundingClientRect.top - 150);
+        })[0];
+
+        if (best) setActiveCat(best.target.id);
       },
-      { rootMargin: "-150px 0px -55% 0px", threshold: [0, 0.25, 0.5, 1] },
+      { rootMargin: "-100px 0px -60% 0px", threshold: [0, 0.1, 0.5, 1] },
     );
+    
+    // Also add a scroll listener to catch the "absolute top" case
+    const handleScroll = () => {
+      if (window.scrollY < 100 && !isNavigating.current && visibleTopCategories[0]) {
+        setActiveCat(visibleTopCategories[0].id);
+      }
+    };
+
     Object.values(sectionRefs.current).forEach((el) => el && observer.observe(el));
-    return () => observer.disconnect();
-  }, [topCategories.length]);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [visibleTopCategories, activeCat]);
 
   // Handle sliding pill animation and horizontal auto-scroll
   useEffect(() => {
@@ -149,8 +171,17 @@ function MenuPage() {
   const scrollTo = (id: string, offset = 120) => {
     const el = document.getElementById(id);
     if (el) {
+      isNavigating.current = true;
+      setActiveCat(id);
+      
       const top = el.getBoundingClientRect().top + window.scrollY - offset;
       window.scrollTo({ top, behavior: "smooth" });
+
+      // Release the observer after the scroll finishes
+      if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+      scrollTimeout.current = setTimeout(() => {
+        isNavigating.current = false;
+      }, 1000);
     }
   };
 

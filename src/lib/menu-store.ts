@@ -1222,8 +1222,44 @@ export function loadMenu(): MenuData {
 
 export function saveMenu(data: MenuData) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  window.dispatchEvent(new CustomEvent(EVENT));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    window.dispatchEvent(new CustomEvent(EVENT));
+  } catch (err: any) {
+    console.error("Storage failed:", err);
+    if (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+      alert("⚠️ STORAGE FULL: The database is too large to save. This usually happens if you have too many large high-resolution images. Please try using smaller images or deleting some items.");
+    } else {
+      alert("⚠️ SAVE FAILED: An unexpected error occurred while saving your changes. Please try refreshing.");
+    }
+  }
+}
+
+/**
+ * Compresses an image data URL to a smaller size/quality to save localStorage space.
+ */
+export async function compressImage(dataUrl: string, maxWidth = 800, quality = 0.7): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = dataUrl;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth) {
+        height = (maxWidth / width) * height;
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl); // Fallback to original if error
+  });
 }
 
 export function uid(prefix: string) {
