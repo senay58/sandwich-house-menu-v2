@@ -1204,12 +1204,19 @@ export function formatPrice(amount: number): string {
 
 // ── Cloud Database (Supabase) Helpers ──
 
+async function withTimeout<T>(promise: Promise<T>, ms: number = 5000): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("Connection Timeout")), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
+
 export async function fetchMenuCloud(): Promise<MenuData | null> {
   try {
-    const [{ data: cats }, { data: items }] = await Promise.all([
-      supabase.from("categories").select("*").order("sort_order", { ascending: true }),
-      supabase.from("menu_items").select("*").order("sort_order", { ascending: true }),
-    ]);
+    const fetchCats = supabase.from("categories").select("*").order("sort_order", { ascending: true });
+    const fetchItems = supabase.from("menu_items").select("*").order("sort_order", { ascending: true });
+
+    const [{ data: cats }, { data: items }] = await withTimeout(Promise.all([fetchCats, fetchItems]), 6000);
 
     if (!cats || !items) return null;
 
@@ -1222,7 +1229,7 @@ export async function fetchMenuCloud(): Promise<MenuData | null> {
       items: items.map(i => ({
         id: i.id,
         name: i.name,
-        description: i.description,
+        description: i.description || "",
         price: Number(i.price),
         categoryId: i.category_id,
         image: i.image || "",
@@ -1232,7 +1239,7 @@ export async function fetchMenuCloud(): Promise<MenuData | null> {
       }))
     };
   } catch (err) {
-    console.error("Fetch Cloud Failed:", err);
+    console.warn("Cloud Fetch Failed (Timeout or Network):", err);
     return null;
   }
 }
@@ -1262,10 +1269,10 @@ export async function saveMenuCloud(data: MenuData) {
     }));
 
     // Start by syncing categories so foreign keys on items work
-    const { error: catError } = await supabase.from("categories").upsert(categoriesToUpsert);
+    const { error: catError } = await withTimeout(supabase.from("categories").upsert(categoriesToUpsert));
     if (catError) throw catError;
 
-    const { error: itemError } = await supabase.from("menu_items").upsert(itemsToUpsert);
+    const { error: itemError } = await withTimeout(supabase.from("menu_items").upsert(itemsToUpsert));
     if (itemError) throw itemError;
 
     return true;
@@ -1354,18 +1361,29 @@ export function useMenu(): {
   data: MenuData; 
   update: (d: MenuData) => Promise<void>; 
   isLoading: boolean;
+  cloudStatus: "online" | "offline" | "connecting";
   migrateToCloud: () => Promise<void>;
+  skipSync: () => void;
 } {
   const [data, setData] = useState<MenuData>(loadMenuLocal());
   const [isLoading, setIsLoading] = useState(true);
+  const [cloudStatus, setCloudStatus] = useState<"online" | "offline" | "connecting">("connecting");
 
   const pull = useCallback(async () => {
-    const cloud = await fetchMenuCloud();
-    if (cloud) {
-      setData(cloud);
-      saveMenuLocal(cloud);
+    try {
+      const cloud = await fetchMenuCloud();
+      if (cloud) {
+        setData(cloud);
+        saveMenuLocal(cloud);
+        setCloudStatus("online");
+      } else {
+        setCloudStatus("offline");
+      }
+    } catch {
+      setCloudStatus("offline");
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
   useEffect(() => {
@@ -1373,18 +1391,25 @@ export function useMenu(): {
     pull();
 
     // 2. Realtime Subscriptions
-    const itemSub = supabase
-      .channel("menu_changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => pull())
-      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => pull())
-      .subscribe();
+    let itemSub: any = null;
+    try {
+      itemSub = supabase
+        .channel("menu_changes")
+        .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => pull())
+        .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => pull())
+        .subscribe((status) => {
+           if (status === "TIMED_OUT" || status === "CLOSED") setCloudStatus("offline");
+        });
+    } catch (err) {
+      console.warn("Realtime not available:", err);
+    }
 
     // 3. Local Event (Fallback)
     const onChange = () => setData(loadMenuLocal());
     window.addEventListener(EVENT, onChange);
 
     return () => {
-      itemSub.unsubscribe();
+      if (itemSub) itemSub.unsubscribe();
       window.removeEventListener(EVENT, onChange);
     };
   }, [pull]);
@@ -1392,14 +1417,27 @@ export function useMenu(): {
   const update = async (next: MenuData) => {
     setData(next);
     saveMenuLocal(next);
-    await saveMenuCloud(next);
+    const success = await saveMenuCloud(next);
+    if (!success) setCloudStatus("offline");
+    else setCloudStatus("online");
   };
 
   const migrateToCloud = async () => {
     const local = loadMenuLocal();
-    await saveMenuCloud(local);
-    await pull();
+    const success = await saveMenuCloud(local);
+    if (success) {
+      setCloudStatus("online");
+      await pull();
+    } else {
+      setCloudStatus("offline");
+      throw new Error("Could not reach the cloud. Please check your internet.");
+    }
   };
 
-  return { data, update, isLoading, migrateToCloud };
+  const skipSync = () => {
+     setIsLoading(false);
+     setCloudStatus("offline");
+  };
+
+  return { data, update, isLoading, cloudStatus, migrateToCloud, skipSync };
 }

@@ -22,7 +22,7 @@ export const Route = createFileRoute("/admin")({
 });
 
 function AdminPage() {
-  const { data, update, isLoading, migrateToCloud } = useMenu();
+  const { data, update, isLoading, cloudStatus, migrateToCloud, skipSync } = useMenu();
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("sandwich_house_admin_auth") === "true";
@@ -270,11 +270,28 @@ function AdminPage() {
   if (isLoading || isSyncing) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-           <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-           <p className="font-serif text-lg font-medium text-muted-foreground animate-pulse">
-             {isSyncing ? "Syncing to Cloud..." : "Connecting to Database..."}
-           </p>
+        <div className="flex flex-col items-center gap-6 px-6 text-center">
+           <div className="relative">
+             <div className="h-16 w-16 animate-spin rounded-full border-4 border-primary border-t-transparent shadow-xl"></div>
+             {isSyncing && <div className="absolute inset-0 flex items-center justify-center"><Cloud className="h-6 w-6 text-primary animate-pulse" /></div>}
+           </div>
+           <div>
+             <p className="font-serif text-xl font-bold text-foreground">
+               {isSyncing ? "Syncing to Cloud..." : "Connecting to Database..."}
+             </p>
+             <p className="mt-2 text-sm font-medium text-muted-foreground">
+               This usually takes a few seconds.
+             </p>
+           </div>
+           
+           {!isSyncing && (
+             <button
+               onClick={skipSync}
+               className="mt-4 rounded-xl border border-border/60 bg-secondary/30 px-6 py-2.5 text-xs font-bold text-muted-foreground transition-all hover:bg-secondary hover:text-foreground"
+             >
+               Skip & Use Local Data
+             </button>
+           )}
         </div>
       </div>
     );
@@ -535,6 +552,28 @@ function AdminPage() {
         <div className="max-w-5xl">
           {activeTab === "settings" && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+               <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/30 p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <div className={`rounded-full p-4 ${cloudStatus === "online" ? "bg-green-500/10 text-green-500" : "bg-orange-500/10 text-orange-500"}`}>
+                    <LayoutDashboard className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-serif text-xl font-bold text-foreground">System Status</h3>
+                    <div className="mt-1 flex items-center gap-2">
+                       <div className={`h-2.5 w-2.5 rounded-full ${cloudStatus === "online" ? "bg-green-500 animate-pulse" : "bg-orange-500"}`}></div>
+                       <span className="text-sm font-bold uppercase tracking-tight">
+                         {cloudStatus === "online" ? "Cloud Connected (Live Sync)" : "Local Storage Mode"}
+                       </span>
+                    </div>
+                  </div>
+                </div>
+                {cloudStatus === "offline" && (
+                   <div className="text-xs font-medium text-muted-foreground text-center md:text-right max-w-[200px]">
+                      Your phone won't see updates made in Local Storage Mode. 
+                   </div>
+                )}
+              </section>
+
                <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/30 p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
                   <div className="rounded-full bg-blue-500/10 p-4 text-blue-500">
