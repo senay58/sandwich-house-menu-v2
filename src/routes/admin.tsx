@@ -619,8 +619,7 @@ function AdminPage() {
                   </button>
                   <button
                     onClick={syncToCloud}
-                    disabled={cloudStatus === "online"}
-                    className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-blue-500 px-6 py-3 text-sm font-bold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                    className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-blue-500 px-6 py-3 text-sm font-bold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-95"
                   >
                     <CloudUpload className="h-4 w-4" />
                     Push Local to Cloud
