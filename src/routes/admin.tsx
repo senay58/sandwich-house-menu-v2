@@ -7,8 +7,8 @@ import {
   uid,
   useMenu,
 } from "@/lib/menu-store";
-import { Plus, ChevronUp, ChevronDown, Edit2, Trash2, ArrowLeft, Settings2, Image as ImageIcon, UploadCloud, QrCode, Download, Database, CloudDownload, CloudUpload, EyeOff, LayoutDashboard, Tag, Coffee, Settings, LogOut, Menu, X, ShieldCheck, Key, Lock, Check, Cloud } from "lucide-react";
-import { compressImage, fetchPasscodeCloud, savePasscodeCloud, deleteItemCloud, deleteCategoryCloud } from "@/lib/menu-store";
+import { Plus, ChevronUp, ChevronDown, Edit2, Trash2, ArrowLeft, Settings2, Image as ImageIcon, UploadCloud, QrCode, Download, Database, CloudDownload, CloudUpload, EyeOff, LayoutDashboard, Tag, Coffee, Settings, LogOut, Menu, X, ShieldCheck, Key, Lock, Check, Cloud, RefreshCw } from "lucide-react";
+import { compressImage, fetchPasscodeCloud, savePasscodeCloud, deleteItemCloud, deleteCategoryCloud, testConnectionCloud } from "@/lib/menu-store";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -256,6 +256,11 @@ function AdminPage() {
     await migrateToCloud();
     setIsSyncing(false);
     alert("Cloud Sync Complete! All devices are now synchronized.");
+  };
+
+  const testCloudConnection = async () => {
+    const res = await testConnectionCloud();
+    alert(res.message);
   };
 
   const topCategories = data.categories.filter((c) => !c.parentId);
@@ -586,13 +591,26 @@ function AdminPage() {
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={syncToCloud}
-                  className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-blue-500 px-6 py-3 text-sm font-bold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-95"
-                >
-                  <CloudUpload className="h-4 w-4" />
-                  Push Local to Cloud
-                </button>
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                   <button
+                    onClick={async () => {
+                      const res = await testConnectionCloud();
+                      alert(res.success ? "✅ " + res.message : "❌ Connection Failed: " + res.message);
+                    }}
+                    className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl border border-border/80 bg-white px-6 py-3 text-sm font-bold text-foreground shadow-sm transition-transform hover:scale-[1.02] active:scale-95"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Test Connection
+                  </button>
+                  <button
+                    onClick={syncToCloud}
+                    disabled={cloudStatus === "online"}
+                    className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-blue-500 px-6 py-3 text-sm font-bold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                  >
+                    <CloudUpload className="h-4 w-4" />
+                    Push Local to Cloud
+                  </button>
+                </div>
               </section>
 
               <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/30 p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
