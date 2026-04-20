@@ -18,7 +18,7 @@ export const Route = createFileRoute("/")(({
 }));
 
 function MenuPage() {
-  const [data] = useMenu();
+  const { data, isLoading } = useMenu();
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -184,6 +184,17 @@ function MenuPage() {
       }, 1000);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+           <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+           <p className="font-serif text-lg font-medium text-muted-foreground animate-pulse">Loading menu...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen bg-background text-foreground font-sans overflow-clip">

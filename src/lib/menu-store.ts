@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { supabase } from "./supabase";
 
 export type Extra = { name: string; price: number };
 
@@ -23,6 +24,11 @@ export type Category = {
 export type MenuData = {
   categories: Category[];
   items: MenuItem[];
+};
+
+export type AppSettings = {
+  id: string;
+  value: any;
 };
 
 const STORAGE_KEY = "sandwich-house-menu-v4";
@@ -1196,42 +1202,120 @@ export function formatPrice(amount: number): string {
   return `ETB ${amount.toLocaleString("en-ET", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
-export function loadMenu(): MenuData {
+// ── Cloud Database (Supabase) Helpers ──
+
+export async function fetchMenuCloud(): Promise<MenuData | null> {
+  try {
+    const [{ data: cats }, { data: items }] = await Promise.all([
+      supabase.from("categories").select("*").order("sort_order", { ascending: true }),
+      supabase.from("menu_items").select("*").order("sort_order", { ascending: true }),
+    ]);
+
+    if (!cats || !items) return null;
+
+    return {
+      categories: cats.map(c => ({ 
+        id: c.id, 
+        name: c.name, 
+        parentId: c.parent_id 
+      })),
+      items: items.map(i => ({
+        id: i.id,
+        name: i.name,
+        description: i.description,
+        price: Number(i.price),
+        categoryId: i.category_id,
+        image: i.image || "",
+        extras: Array.isArray(i.extras) ? i.extras : [],
+        available: i.available !== false,
+        tags: i.tags || []
+      }))
+    };
+  } catch (err) {
+    console.error("Fetch Cloud Failed:", err);
+    return null;
+  }
+}
+
+export async function saveMenuCloud(data: MenuData) {
+  try {
+    // 1. Prepare Categories
+    const categoriesToUpsert = data.categories.map((c, idx) => ({
+      id: c.id,
+      name: c.name,
+      parent_id: c.parentId || null,
+      sort_order: idx
+    }));
+
+    // 2. Prepare Items
+    const itemsToUpsert = data.items.map((i, idx) => ({
+      id: i.id,
+      name: i.name,
+      description: i.description || "",
+      price: i.price,
+      category_id: i.categoryId,
+      image: i.image || "",
+      extras: i.extras || [],
+      available: i.available !== false,
+      tags: i.tags || [],
+      sort_order: idx
+    }));
+
+    // Start by syncing categories so foreign keys on items work
+    const { error: catError } = await supabase.from("categories").upsert(categoriesToUpsert);
+    if (catError) throw catError;
+
+    const { error: itemError } = await supabase.from("menu_items").upsert(itemsToUpsert);
+    if (itemError) throw itemError;
+
+    return true;
+  } catch (err) {
+    console.error("Cloud Save Failed:", err);
+    return false;
+  }
+}
+
+export async function deleteItemCloud(id: string) {
+  await supabase.from("menu_items").delete().eq("id", id);
+}
+
+export async function deleteCategoryCloud(id: string) {
+  await supabase.from("categories").delete().eq("id", id);
+}
+
+// ── Passcode Persistence ──
+export async function fetchPasscodeCloud(): Promise<string | null> {
+  const { data } = await supabase.from("app_settings").select("value").eq("id", "admin_passcode").single();
+  return data?.value?.passcode || null;
+}
+
+export async function savePasscodeCloud(passcode: string) {
+  await supabase.from("app_settings").upsert({ id: "admin_passcode", value: { passcode } });
+}
+
+// ── Legacy Local Storage ──
+export function loadMenuLocal(): MenuData {
   if (typeof window === "undefined") return DEFAULT_DATA;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-       return DEFAULT_DATA;
-    }
-    
+    if (!raw) return DEFAULT_DATA;
     const parsed = JSON.parse(raw) as MenuData;
-    if (!parsed.categories || !parsed.items) return DEFAULT_DATA;
-    
-    // migrate items to have default available=true and tags
-    parsed.items = parsed.items.map(item => ({
-      ...item,
-      available: item.available !== false,
-      tags: item.tags || []
-    }));
-    
-    return parsed;
+    return {
+      categories: parsed.categories || [],
+      items: (parsed.items || []).map(i => ({ ...i, available: i.available !== false, tags: i.tags || [] }))
+    };
   } catch {
     return DEFAULT_DATA;
   }
 }
 
-export function saveMenu(data: MenuData) {
+export function saveMenuLocal(data: MenuData) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     window.dispatchEvent(new CustomEvent(EVENT));
-  } catch (err: any) {
-    console.error("Storage failed:", err);
-    if (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-      alert("⚠️ STORAGE FULL: The database is too large to save. This usually happens if you have too many large high-resolution images. Please try using smaller images or deleting some items.");
-    } else {
-      alert("⚠️ SAVE FAILED: An unexpected error occurred while saving your changes. Please try refreshing.");
-    }
+  } catch (err) {
+    console.warn("Local save failed (usually storage full)");
   }
 }
 
@@ -1266,24 +1350,56 @@ export function uid(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export function useMenu(): [MenuData, (d: MenuData) => void] {
-  const [data, setData] = useState<MenuData>(DEFAULT_DATA);
+export function useMenu(): { 
+  data: MenuData; 
+  update: (d: MenuData) => Promise<void>; 
+  isLoading: boolean;
+  migrateToCloud: () => Promise<void>;
+} {
+  const [data, setData] = useState<MenuData>(loadMenuLocal());
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    setData(loadMenu());
-    const onChange = () => setData(loadMenu());
-    window.addEventListener(EVENT, onChange);
-    window.addEventListener("storage", onChange);
-    return () => {
-      window.removeEventListener(EVENT, onChange);
-      window.removeEventListener("storage", onChange);
-    };
+  const pull = useCallback(async () => {
+    const cloud = await fetchMenuCloud();
+    if (cloud) {
+      setData(cloud);
+      saveMenuLocal(cloud);
+    }
+    setIsLoading(false);
   }, []);
 
-  const update = (next: MenuData) => {
+  useEffect(() => {
+    // 1. Initial Pull
+    pull();
+
+    // 2. Realtime Subscriptions
+    const itemSub = supabase
+      .channel("menu_changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => pull())
+      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => pull())
+      .subscribe();
+
+    // 3. Local Event (Fallback)
+    const onChange = () => setData(loadMenuLocal());
+    window.addEventListener(EVENT, onChange);
+
+    return () => {
+      itemSub.unsubscribe();
+      window.removeEventListener(EVENT, onChange);
+    };
+  }, [pull]);
+
+  const update = async (next: MenuData) => {
     setData(next);
-    saveMenu(next);
+    saveMenuLocal(next);
+    await saveMenuCloud(next);
   };
 
-  return [data, update];
+  const migrateToCloud = async () => {
+    const local = loadMenuLocal();
+    await saveMenuCloud(local);
+    await pull();
+  };
+
+  return { data, update, isLoading, migrateToCloud };
 }

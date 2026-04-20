@@ -7,8 +7,8 @@ import {
   uid,
   useMenu,
 } from "@/lib/menu-store";
-import { Plus, ChevronUp, ChevronDown, Edit2, Trash2, ArrowLeft, Settings2, Image as ImageIcon, UploadCloud, QrCode, Download, Database, CloudDownload, CloudUpload, EyeOff, LayoutDashboard, Tag, Coffee, Settings, LogOut, Menu, X, ShieldCheck, Key, Lock, Check } from "lucide-react";
-import { compressImage } from "@/lib/menu-store";
+import { Plus, ChevronUp, ChevronDown, Edit2, Trash2, ArrowLeft, Settings2, Image as ImageIcon, UploadCloud, QrCode, Download, Database, CloudDownload, CloudUpload, EyeOff, LayoutDashboard, Tag, Coffee, Settings, LogOut, Menu, X, ShieldCheck, Key, Lock, Check, Cloud } from "lucide-react";
+import { compressImage, fetchPasscodeCloud, savePasscodeCloud, deleteItemCloud, deleteCategoryCloud } from "@/lib/menu-store";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/admin")({
 });
 
 function AdminPage() {
-  const [data, setData] = useMenu();
+  const { data, update, isLoading, migrateToCloud } = useMenu();
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("sandwich_house_admin_auth") === "true";
@@ -32,13 +32,21 @@ function AdminPage() {
   const [passcode, setPasscode] = useState("");
   const [loginError, setLoginError] = useState(false);
   const [newPasscode, setNewPasscode] = useState("");
+  const [currentPasscode, setCurrentPasscode] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  const [currentPasscode, setCurrentPasscode] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("sandwich_house_admin_passcode") || "";
-    }
-    return "";
-  });
+  useEffect(() => {
+    // Attempt to pull passcode from cloud on load
+    fetchPasscodeCloud().then(pw => {
+      if (pw) {
+        setCurrentPasscode(pw);
+        localStorage.setItem("sandwich_house_admin_passcode", pw);
+      } else {
+        const local = localStorage.getItem("sandwich_house_admin_passcode");
+        if (local) setCurrentPasscode(local);
+      }
+    });
+  }, []);
 
   const [stayLoggedIn, setStayLoggedIn] = useState(() => {
     if (typeof window !== "undefined") {
@@ -47,7 +55,7 @@ function AdminPage() {
     return false;
   });
 
-  const isFirstTime = !currentPasscode;
+  const isFirstTime = !currentPasscode && !isLoading;
   
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [editingCat, setEditingCat] = useState<Category | null>(null);
@@ -73,22 +81,28 @@ function AdminPage() {
     }
   };
 
-  const handleInitialSetup = (e: React.FormEvent) => {
+  const handleInitialSetup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPasscode.trim()) return;
+    setIsSyncing(true);
+    await savePasscodeCloud(newPasscode);
     setCurrentPasscode(newPasscode);
     localStorage.setItem("sandwich_house_admin_passcode", newPasscode);
     setIsAuthenticated(true);
     localStorage.setItem("sandwich_house_admin_auth", "true");
     setNewPasscode("");
+    setIsSyncing(false);
     alert("Passcode set successfully! Welcome to your Admin dashboard.");
   };
 
-  const handleUpdatePasscode = () => {
+  const handleUpdatePasscode = async () => {
     if (!newPasscode.trim()) return;
+    setIsSyncing(true);
+    await savePasscodeCloud(newPasscode);
     setCurrentPasscode(newPasscode);
     localStorage.setItem("sandwich_house_admin_passcode", newPasscode);
     setNewPasscode("");
+    setIsSyncing(false);
     alert("Passcode updated successfully!");
   };
 
@@ -105,23 +119,29 @@ function AdminPage() {
 
   // ── Categories ──
   const addCategory = () => setEditingCat({ id: uid("cat"), name: "", parentId: undefined });
-  const saveCategory = (cat: Category) => {
+  const saveCategory = async (cat: Category) => {
     const exists = data.categories.find((c) => c.id === cat.id);
     const categories = exists
       ? data.categories.map((c) => (c.id === cat.id ? cat : c))
       : [...data.categories, cat];
-    setData({ ...data, categories });
+    await update({ ...data, categories });
     setEditingCat(null);
   };
-  const deleteCategory = (id: string) => {
+  const deleteCategory = async (id: string) => {
     if (!confirm("Delete this category? Items in it will also be removed.")) return;
     const removedIds = new Set([id, ...data.categories.filter((c) => c.parentId === id).map((c) => c.id)]);
-    setData({
+    
+    // Cloud delete
+    for (const rId of Array.from(removedIds)) {
+      await deleteCategoryCloud(rId);
+    }
+
+    await update({
       categories: data.categories.filter((c) => !removedIds.has(c.id)),
       items: data.items.filter((i) => !removedIds.has(i.categoryId)),
     });
   };
-  const moveCategory = (id: string, dir: -1 | 1) => {
+  const moveCategory = async (id: string, dir: -1 | 1) => {
     const idx = data.categories.findIndex((c) => c.id === id);
     if (idx < 0) return;
     const next = [...data.categories];
@@ -136,7 +156,7 @@ function AdminPage() {
     
     const targetSibIdx = next.findIndex(c => c.id === sibs[sibIdx + dir].id);
     [next[idx], next[targetSibIdx]] = [next[targetSibIdx], next[idx]];
-    setData({ ...data, categories: next });
+    await update({ ...data, categories: next });
   };
 
   // ── Items ──
@@ -152,17 +172,18 @@ function AdminPage() {
       available: true,
       tags: [],
     });
-  const saveItem = (item: MenuItem) => {
+  const saveItem = async (item: MenuItem) => {
     const exists = data.items.find((i) => i.id === item.id);
     const items = exists
       ? data.items.map((i) => (i.id === item.id ? item : i))
       : [...data.items, item];
-    setData({ ...data, items });
+    await update({ ...data, items });
     setEditingItem(null);
   };
-  const deleteItem = (id: string) => {
+  const deleteItem = async (id: string) => {
     if (!confirm("Delete this item?")) return;
-    setData({ ...data, items: data.items.filter((i) => i.id !== id) });
+    await deleteItemCloud(id);
+    await update({ ...data, items: data.items.filter((i) => i.id !== id) });
   };
 
   // ── Item Drag and Drop Reordering ──
@@ -208,15 +229,15 @@ function AdminPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (parsed.categories && parsed.items) {
-          setData(parsed);
+          await update(parsed);
           alert("Database Restored Successfully!");
         } else {
           alert("Invalid backup file structure.");
@@ -229,6 +250,14 @@ function AdminPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const syncToCloud = async () => {
+    if (!confirm("This will push your current local data to the Cloud and overwrite anything already there. Continue?")) return;
+    setIsSyncing(true);
+    await migrateToCloud();
+    setIsSyncing(false);
+    alert("Cloud Sync Complete! All devices are now synchronized.");
+  };
+
   const topCategories = data.categories.filter((c) => !c.parentId);
   const subCatsByParent: Record<string, Category[]> = {};
   for (const c of data.categories) {
@@ -236,6 +265,19 @@ function AdminPage() {
       if (!subCatsByParent[c.parentId]) subCatsByParent[c.parentId] = [];
       subCatsByParent[c.parentId].push(c);
     }
+  }
+
+  if (isLoading || isSyncing) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+           <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+           <p className="font-serif text-lg font-medium text-muted-foreground animate-pulse">
+             {isSyncing ? "Syncing to Cloud..." : "Connecting to Database..."}
+           </p>
+        </div>
+      </div>
+    );
   }
 
   if (!isAuthenticated && !stayLoggedIn) {
@@ -492,16 +534,36 @@ function AdminPage() {
 
         <div className="max-w-5xl">
           {activeTab === "settings" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-8               <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/30 p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-full bg-blue-500/10 p-4 text-blue-500">
+                    <Cloud className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-serif text-xl font-bold text-foreground">Cloud Sync</h3>
+                    <p className="text-sm font-medium text-muted-foreground mt-1 max-w-sm">
+                      Pushes your current laptop's menu to the cloud so it appears on your phone. **Only use this once** to start the live sync.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={syncToCloud}
+                  className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-blue-500 px-6 py-3 text-sm font-bold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-95"
+                >
+                  <CloudUpload className="h-4 w-4" />
+                  Push Local to Cloud
+                </button>
+              </section>
+
               <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/30 p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
                   <div className="rounded-full bg-primary/10 p-4 text-primary">
                     <Database className="h-6 w-6" />
                   </div>
                   <div>
-                    <h3 className="font-serif text-xl font-bold text-foreground">Database Sync</h3>
+                    <h3 className="font-serif text-xl font-bold text-foreground">Database Backup</h3>
                     <p className="text-sm font-medium text-muted-foreground mt-1 max-w-sm">
-                      Create an offline backup of your database, or restore the database file on this device.
+                      Create an offline backup file of your menu, or restore from a previously saved file.
                     </p>
                   </div>
                 </div>
@@ -512,15 +574,17 @@ function AdminPage() {
                     className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl border border-border/80 bg-white px-6 py-3 text-sm font-bold text-foreground shadow-sm transition-transform hover:scale-[1.02] active:scale-95"
                   >
                     <CloudDownload className="h-4 w-4" />
-                    Restore DB
+                    Restore File
                   </button>
                   <button
                     onClick={handleExport}
                     className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-foreground px-6 py-3 text-sm font-bold text-background shadow-lg transition-transform hover:scale-[1.02] active:scale-95"
                   >
-                    <CloudUpload className="h-4 w-4" />
-                    Backup DB
+                    <Download className="h-4 w-4" />
+                    Download Backup
                   </button>
+                </div>
+              </section> </button>
                 </div>
               </section>
 
