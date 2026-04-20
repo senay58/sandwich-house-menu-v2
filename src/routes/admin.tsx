@@ -85,25 +85,35 @@ function AdminPage() {
     e.preventDefault();
     if (!newPasscode.trim()) return;
     setIsSyncing(true);
-    await savePasscodeCloud(newPasscode);
-    setCurrentPasscode(newPasscode);
-    localStorage.setItem("sandwich_house_admin_passcode", newPasscode);
-    setIsAuthenticated(true);
-    localStorage.setItem("sandwich_house_admin_auth", "true");
-    setNewPasscode("");
-    setIsSyncing(false);
-    alert("Passcode set successfully! Welcome to your Admin dashboard.");
+    try {
+      await savePasscodeCloud(newPasscode);
+      setCurrentPasscode(newPasscode);
+      localStorage.setItem("sandwich_house_admin_passcode", newPasscode);
+      setIsAuthenticated(true);
+      localStorage.setItem("sandwich_house_admin_auth", "true");
+      setNewPasscode("");
+      alert("Passcode set successfully! Welcome to your Admin dashboard.");
+    } catch (err: any) {
+      alert("Initial setup failed: " + err.message);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleUpdatePasscode = async () => {
     if (!newPasscode.trim()) return;
     setIsSyncing(true);
-    await savePasscodeCloud(newPasscode);
-    setCurrentPasscode(newPasscode);
-    localStorage.setItem("sandwich_house_admin_passcode", newPasscode);
-    setNewPasscode("");
-    setIsSyncing(false);
-    alert("Passcode updated successfully!");
+    try {
+      await savePasscodeCloud(newPasscode);
+      setCurrentPasscode(newPasscode);
+      localStorage.setItem("sandwich_house_admin_passcode", newPasscode);
+      setNewPasscode("");
+      alert("Passcode updated successfully!");
+    } catch (err: any) {
+      alert("Failed to update passcode in cloud: " + err.message);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const toggleStayLoggedIn = () => {
@@ -253,9 +263,14 @@ function AdminPage() {
   const syncToCloud = async () => {
     if (!confirm("This will push your current local data to the Cloud and overwrite anything already there. Continue?")) return;
     setIsSyncing(true);
-    await migrateToCloud();
-    setIsSyncing(false);
-    alert("Cloud Sync Complete! All devices are now synchronized.");
+    try {
+      await migrateToCloud();
+      alert("✅ Cloud Sync Complete! All devices are now synchronized.");
+    } catch (err: any) {
+      alert("❌ Sync Failed: " + (err.message || "Unknown error"));
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const testCloudConnection = async () => {
