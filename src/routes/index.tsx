@@ -427,36 +427,39 @@ function ItemList({ items }: { items: MenuItem[] }) {
         const isGF = hasTag("Gluten-Free");
         const isFasting = hasTag("Fasting");
 
+        const PriceBadge = ({ price, inverted }: { price: number, inverted?: boolean }) => (
+          <div className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 backdrop-blur-md shadow-lg border ${
+            inverted 
+              ? "bg-primary/10 border-primary/20" 
+              : "bg-white/90 border-white/20"
+          }`}>
+             <span className={`text-[10px] font-black ${inverted ? "text-primary/60" : "text-primary opacity-60"}`}>ETB</span>
+             <span className={`text-sm font-black ${inverted ? "text-primary" : "text-foreground"}`}>{price.toLocaleString("en-ET")}</span>
+          </div>
+        );
+
         return (
           <li
             key={item.id}
-            className="group relative flex flex-col overflow-hidden rounded-[2.5rem] border border-primary/10 bg-white/40 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-500 hover:-translate-y-2 hover:border-primary/40 hover:shadow-[0_20px_40px_-15px_rgba(40,120,80,0.15)]"
+            className="group relative flex flex-col overflow-hidden rounded-[2.5rem] border border-primary/10 bg-gradient-to-br from-white/60 via-white/40 to-primary/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-500 hover:-translate-y-2 hover:border-primary/40 hover:shadow-[0_20px_40px_-15px_rgba(40,120,80,0.15)]"
           >
-            {/* Image Container with Fixed Aspect Ratio to prevent cropping */}
-            <div className="relative aspect-[16/10] w-full overflow-hidden bg-secondary/30 sm:aspect-[16/9]">
-              {item.image ? (
+            {/* Image Section - Only if exists */}
+            {item.image && (
+              <div className="relative aspect-[16/10] w-full overflow-hidden sm:aspect-[16/9]">
                 <img
                   src={item.image}
                   alt={item.name}
                   loading="lazy"
                   className="h-full w-full object-cover transition-transform duration-1000 group-hover:scale-110"
                 />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center opacity-20">
-                  <ChefHat className="h-12 w-12 text-muted-foreground" />
-                </div>
-              )}
-              {/* Refined gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
-              
-              {/* Price Badge over Image on Mobile/Desktop - Always Visible */}
-              <div className="absolute bottom-4 right-4 z-10">
-                <div className="flex items-center gap-1.5 rounded-2xl bg-white/90 px-3 py-1.5 backdrop-blur-md shadow-lg border border-white/20">
-                   <span className="text-[10px] font-black text-primary opacity-60">ETB</span>
-                   <span className="text-sm font-black text-foreground">{item.price.toLocaleString("en-ET")}</span>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                
+                {/* Price Badge over Image */}
+                <div className="absolute bottom-4 right-4 z-10">
+                  <PriceBadge price={item.price} />
                 </div>
               </div>
-            </div>
+            )}
             
             <div className="flex flex-1 flex-col p-6 sm:p-8">
               <div className="mb-4">
@@ -464,6 +467,12 @@ function ItemList({ items }: { items: MenuItem[] }) {
                   <h4 className="font-serif text-xl font-extrabold leading-tight text-foreground transition-colors group-hover:text-primary sm:text-2xl">
                     {item.name}
                   </h4>
+                  {/* Price Badge in Header if no image */}
+                  {!item.image && (
+                    <div className="shrink-0">
+                      <PriceBadge price={item.price} inverted />
+                    </div>
+                  )}
                 </div>
                 
                 {/* Dietary Badges */}
