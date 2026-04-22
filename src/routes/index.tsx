@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMenu, formatPrice } from "@/lib/menu-store";
 import { Leaf, Flame, Sparkles, ChefHat, Search, X, Wheat, Utensils } from "lucide-react";
 
