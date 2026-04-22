@@ -102,18 +102,17 @@ function AdminPage() {
 
   const handleUpdatePasscode = async () => {
     if (!newPasscode.trim()) return;
-    setIsSyncing(true);
-    try {
-      await savePasscodeCloud(newPasscode);
-      setCurrentPasscode(newPasscode);
-      localStorage.setItem("sandwich_house_admin_passcode", newPasscode);
-      setNewPasscode("");
-      alert("Passcode updated successfully!");
-    } catch (err: any) {
-      alert("Failed to update passcode in cloud: " + err.message);
-    } finally {
-      setIsSyncing(false);
-    }
+    
+    // Optimistic local update
+    const nextVal = newPasscode;
+    setCurrentPasscode(nextVal);
+    localStorage.setItem("sandwich_house_admin_passcode", nextVal);
+    setNewPasscode("");
+    
+    // Background cloud update
+    savePasscodeCloud(nextVal)
+      .then(() => alert("Passcode updated in cloud!"))
+      .catch(err => alert("Cloud passcode update failed: " + err.message));
   };
 
   const toggleStayLoggedIn = () => {
@@ -134,24 +133,33 @@ function AdminPage() {
     const categories = exists
       ? data.categories.map((c) => (c.id === cat.id ? cat : c))
       : [...data.categories, cat];
-    await update({ ...data, categories });
+    
+    // Non-blocking update
+    update({ ...data, categories });
     setEditingCat(null);
   };
-  const deleteCategory = async (id: string) => {
+  const deleteCategory = (id: string) => {
     if (!confirm("Delete this category? Items in it will also be removed.")) return;
     const removedIds = new Set([id, ...data.categories.filter((c) => c.parentId === id).map((c) => c.id)]);
     
-    // Cloud delete
-    for (const rId of Array.from(removedIds)) {
-      await deleteCategoryCloud(rId);
-    }
-
-    await update({
+    // 1. Instant local update
+    update({
       categories: data.categories.filter((c) => !removedIds.has(c.id)),
       items: data.items.filter((i) => !removedIds.has(i.categoryId)),
     });
+
+    // 2. Background cloud cleanup
+    (async () => {
+       try {
+         for (const rId of Array.from(removedIds)) {
+           await deleteCategoryCloud(rId);
+         }
+       } catch (err) {
+         console.warn("Background category deletion failed:", err);
+       }
+    })();
   };
-  const moveCategory = async (id: string, dir: -1 | 1) => {
+  const moveCategory = (id: string, dir: -1 | 1) => {
     const idx = data.categories.findIndex((c) => c.id === id);
     if (idx < 0) return;
     const next = [...data.categories];
@@ -166,7 +174,7 @@ function AdminPage() {
     
     const targetSibIdx = next.findIndex(c => c.id === sibs[sibIdx + dir].id);
     [next[idx], next[targetSibIdx]] = [next[targetSibIdx], next[idx]];
-    await update({ ...data, categories: next });
+    update({ ...data, categories: next });
   };
 
   // ── Items ──
@@ -187,13 +195,17 @@ function AdminPage() {
     const items = exists
       ? data.items.map((i) => (i.id === item.id ? item : i))
       : [...data.items, item];
-    await update({ ...data, items });
+    
+    // Non-blocking update
+    update({ ...data, items });
     setEditingItem(null);
   };
-  const deleteItem = async (id: string) => {
+  const deleteItem = (id: string) => {
     if (!confirm("Delete this item?")) return;
-    await deleteItemCloud(id);
-    await update({ ...data, items: data.items.filter((i) => i.id !== id) });
+    // 1. Instant local update
+    update({ ...data, items: data.items.filter((i) => i.id !== id) });
+    // 2. Background cleanup
+    deleteItemCloud(id).catch(err => console.warn("Background item deletion failed:", err));
   };
 
   // ── Item Drag and Drop Reordering ──
@@ -808,7 +820,7 @@ function AdminPage() {
                 </div>
               )}
               
-              <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              <ul className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {data.items.map((it) => {
                   const cat = data.categories.find((c) => c.id === it.categoryId);
                   const parentCat = cat?.parentId
@@ -824,50 +836,58 @@ function AdminPage() {
                       onDragStart={(e) => handleItemDragStart(it.id, e)}
                       onDragOver={handleItemDragOver}
                       onDrop={(e) => handleItemDrop(it.id, e)}
-                      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-card p-5 shadow-sm transition-all hover:shadow-lg hover:-translate-y-1 cursor-grab active:cursor-grabbing ${
+                      className={`group relative flex flex-col overflow-hidden rounded-[2rem] border bg-card shadow-[0_4px_15px_-4px_rgba(0,0,0,0.05)] transition-all hover:shadow-xl hover:-translate-y-1 cursor-grab active:cursor-grabbing ${
                         isAvailable ? "border-border/60 hover:border-primary/40" : "border-border/30 opacity-60 grayscale hover:grayscale-0"
                       } ${draggedItemId === it.id ? "opacity-30 border-primary border-dashed" : ""}`}
                     >
-                      <div className="mb-4 flex items-start gap-4 pointer-events-none">
-                        <div className="relative h-20 w-20 shrink-0 rounded-[14px] overflow-hidden border border-border/50 bg-secondary/50 flex items-center justify-center flex-col">
-                          {it.image ? (
-                            <img src={it.image} alt={it.name} className="h-full w-full object-cover transition-transform group-hover:scale-110 duration-500" />
-                          ) : (
-                            <ImageIcon className="h-6 w-6 text-muted-foreground opacity-30" />
-                          )}
-                          {!isAvailable && (
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-[1px]">
-                              <EyeOff className="h-5 w-5 text-white/90" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0 pt-1.5">
-                          <h4 className="truncate font-serif text-lg font-bold text-foreground">
-                            {it.name}
-                          </h4>
-                          <div className="mt-0.5 flex items-center gap-2">
-                             <span className="text-sm font-bold text-primary">{formatPrice(it.price)}</span>
-                             {!isAvailable && <span className="rounded-sm bg-red-500/10 px-1.5 py-0.5 text-[9px] font-sans font-bold text-red-600 uppercase tracking-widest">Hidden</span>}
+                      {/* Image Preview with fixed ratio */}
+                      <div className="relative aspect-[16/9] w-full overflow-hidden bg-secondary/30">
+                        {it.image ? (
+                          <img src={it.image} alt={it.name} className="h-full w-full object-cover transition-transform group-hover:scale-110" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center">
+                            <ImageIcon className="h-8 w-8 text-muted-foreground opacity-20" />
                           </div>
-                          <p className="mt-1.5 truncate text-[10px] uppercase tracking-wider text-muted-foreground/80 font-bold bg-secondary w-max px-2 py-0.5 rounded pl-1.5 border border-border/50">
-                            <span className="opacity-50">#</span> {parentCat ? `${parentCat.name} › ` : ""}{cat?.name ?? "—"}
-                          </p>
+                        )}
+                        {!isAvailable && (
+                          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center backdrop-blur-sm">
+                            <EyeOff className="h-6 w-6 text-white mb-1" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/80">Hidden</span>
+                          </div>
+                        )}
+                        
+                        {/* Admin Info Badge */}
+                        <div className="absolute top-3 left-3">
+                           <span className="inline-flex items-center gap-1.5 rounded-lg bg-black/40 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-white backdrop-blur-md border border-white/10">
+                              {parentCat ? parentCat.name : cat?.name ?? "..."}
+                           </span>
                         </div>
                       </div>
-                      
-                      <div className="mt-auto grid grid-cols-2 gap-2 border-t border-border/30 pt-4 relative z-10">
-                        <button
-                          onClick={() => setEditingItem(it)}
-                          className="flex items-center justify-center gap-1.5 rounded-xl bg-secondary/50 py-2.5 text-xs font-semibold text-foreground hover:bg-foreground hover:text-background transition-colors cursor-pointer"
-                        >
-                          <Edit2 className="h-3 w-3" /> Edit
-                        </button>
-                        <button
-                          onClick={() => deleteItem(it.id)}
-                          className="flex items-center justify-center gap-1.5 rounded-xl bg-destructive/5 py-2.5 text-xs font-semibold text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="h-3 w-3" /> Delete
-                        </button>
+
+                      <div className="flex flex-1 flex-col p-5">
+                        <div className="mb-3">
+                          <h4 className="font-serif text-lg font-extrabold leading-tight text-foreground transition-colors group-hover:text-primary">
+                            {it.name}
+                          </h4>
+                          <div className="mt-1 flex items-center gap-2">
+                             <span className="text-sm font-black text-primary">{formatPrice(it.price)}</span>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-auto grid grid-cols-2 gap-2 border-t border-border/40 pt-4">
+                          <button
+                            onClick={() => setEditingItem(it)}
+                            className="flex items-center justify-center gap-2 rounded-xl bg-secondary/80 py-2.5 text-xs font-bold text-foreground hover:bg-foreground hover:text-background transition-colors cursor-pointer"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" /> Edit
+                          </button>
+                          <button
+                            onClick={() => deleteItem(it.id)}
+                            className="flex items-center justify-center gap-2 rounded-xl bg-red-500/10 py-2.5 text-xs font-bold text-red-600 hover:bg-red-600 hover:text-white transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" /> Delete
+                          </button>
+                        </div>
                       </div>
                     </li>
                   );

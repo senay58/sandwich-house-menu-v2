@@ -99,28 +99,31 @@ function MenuPage() {
     });
   }, [topCategories, itemsByCat, subCategoriesByParent]);
 
-  // Handle active category updates from scrolling
+  // Handle active category updates from scrolling - Ultra Stable Version
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         if (isNavigating.current) return;
         
-        const entriesInView = entries.filter((e) => e.isIntersecting);
-        if (entriesInView.length === 0) return;
+        // Find all visible sections
+        const visibleEntries = entries.filter((e) => e.isIntersecting);
+        if (visibleEntries.length === 0) return;
 
-        // Sort by how close they are to the top of our "active" zone
-        const best = entriesInView.sort((a, b) => {
-          return Math.abs(a.boundingClientRect.top - 150) - Math.abs(b.boundingClientRect.top - 150);
-        })[0];
+        // Pick the one closest to the top of the viewport (with a 200px offset)
+        const active = visibleEntries.reduce((prev, curr) => {
+          return Math.abs(curr.boundingClientRect.top - 200) < Math.abs(prev.boundingClientRect.top - 200) ? curr : prev;
+        });
 
-        if (best) setActiveCat(best.target.id);
+        if (active && active.target.id !== activeCat) {
+          setActiveCat(active.target.id);
+        }
       },
-      { rootMargin: "-100px 0px -60% 0px", threshold: [0, 0.1, 0.5, 1] },
+      { rootMargin: "-20% 0px -70% 0px", threshold: [0, 0.2, 1] },
     );
     
-    // Also add a scroll listener to catch the "absolute top" case
+    // Absolute top fallback
     const handleScroll = () => {
-      if (window.scrollY < 100 && !isNavigating.current && visibleTopCategories[0]) {
+      if (window.scrollY < 50 && !isNavigating.current && visibleTopCategories[0]) {
         setActiveCat(visibleTopCategories[0].id);
       }
     };
@@ -134,8 +137,8 @@ function MenuPage() {
     };
   }, [visibleTopCategories, activeCat]);
 
-  // Handle sliding pill animation and horizontal auto-scroll
-  useEffect(() => {
+  // Butter-Smooth Horizontal Pill Motion (Hardware Accelerated)
+  useLayoutEffect(() => {
     if (!activeCat) return;
 
     const navContainer = navScrollRef.current;
@@ -143,7 +146,7 @@ function MenuPage() {
 
     if (activeItem && navContainer) {
       const updatePill = () => {
-        // Standard offsetLeft works perfectly ONLY if the absolute element is anchored with left-0
+        // Use transform: translate3d for smooth 60fps movement
         setPillStyle({
           width: activeItem.offsetWidth,
           left: activeItem.offsetLeft,
@@ -151,22 +154,19 @@ function MenuPage() {
         });
       };
 
-      // Run immediately and on next frame to ensure layout is settled
       updatePill();
-      requestAnimationFrame(updatePill);
-
-      // Auto-scroll the nav to keep the active item in view with some padding
+      
+      // Auto-scroll the nav container
       const scrollLeft = activeItem.offsetLeft - navContainer.offsetWidth / 2 + activeItem.offsetWidth / 2;
       navContainer.scrollTo({
         left: scrollLeft,
         behavior: "smooth",
       });
 
-      // Recalculate on window resize to keep it aligned on desktop
       window.addEventListener('resize', updatePill);
       return () => window.removeEventListener('resize', updatePill);
     }
-  }, [activeCat, topCategories]);
+  }, [activeCat]);
 
   const scrollTo = (id: string, offset = 120) => {
     const el = document.getElementById(id);
@@ -276,12 +276,12 @@ function MenuPage() {
                 ref={navScrollRef}
                 className="flex gap-2 overflow-x-auto px-4 py-3 no-scrollbar sm:justify-center relative scroll-smooth"
               >
-                {/* The sliding pill background indicator */}
+                {/* Hardware Accelerated Sliding Pill Background */}
                 <div 
-                  className="absolute left-0 top-3 bottom-0 rounded-full bg-primary shadow-md shadow-primary/30 transition-all duration-300 ease-out h-[40px]"
+                  className="absolute top-3 bottom-0 h-10 rounded-full bg-primary shadow-md shadow-primary/30 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
                   style={{
-                    width: pillStyle.width,
-                    transform: `translateX(${pillStyle.left}px)`,
+                    width: `${pillStyle.width}px`,
+                    transform: `translate3d(${pillStyle.left}px, 0, 0)`,
                     opacity: pillStyle.opacity,
                     zIndex: 0,
                   }}
@@ -420,7 +420,7 @@ function MenuPage() {
 
 function ItemList({ items }: { items: MenuItem[] }) {
   return (
-    <ul className="grid gap-6 sm:grid-cols-2 lg:gap-8">
+    <ul className="grid gap-6 sm:grid-cols-2 lg:gap-10">
       {items.map((item) => {
         const hasTag = (tag: string) => (item.tags || []).includes(tag);
         const isSpicy = hasTag("Spicy");
@@ -431,83 +431,85 @@ function ItemList({ items }: { items: MenuItem[] }) {
         return (
           <li
             key={item.id}
-            className="group relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-card via-card to-primary/10 backdrop-blur-sm transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_12px_30px_-10px_rgba(40,120,80,0.25)] hover:border-primary/50"
+            className="group relative flex flex-col overflow-hidden rounded-[2.5rem] border border-primary/10 bg-white/40 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-500 hover:-translate-y-2 hover:border-primary/40 hover:shadow-[0_20px_40px_-15px_rgba(40,120,80,0.15)]"
           >
-            <div className="flex flex-col sm:flex-row h-full">
-              {/* Image Section */}
-              {item.image && (
-                <div className="relative h-56 w-full sm:h-auto sm:w-2/5 shrink-0 overflow-hidden">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    loading="lazy"
-                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent sm:bg-gradient-to-r sm:from-black/10 sm:to-black/0"></div>
-                </div>
-              )}
-              
-              {/* Content Section */}
-              <div className="flex flex-1 flex-col p-6 sm:p-7">
-                <div className="mb-2 flex items-start justify-between gap-4">
-                  <div>
-                    <h4 className="font-serif text-xl font-bold leading-tight text-foreground group-hover:text-primary transition-colors">
-                      {item.name}
-                    </h4>
-                    {/* Dietary Indicators */}
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {isSpicy && (
-                        <div className="flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600 border border-red-100 uppercase tracking-wider">
-                          <Flame className="h-3 w-3" /> Spicy
-                        </div>
-                      )}
-                      {isVegan && (
-                        <div className="flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600 border border-emerald-100 uppercase tracking-wider">
-                          <Leaf className="h-3 w-3" /> Vegan
-                        </div>
-                      )}
-                      {isGF && (
-                        <div className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-600 border border-amber-100 uppercase tracking-wider">
-                          <Wheat className="h-3 w-3" /> Gluten-Free
-                        </div>
-                      )}
-                      {isFasting && (
-                        <div className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-600 border border-blue-100 uppercase tracking-wider">
-                          <Utensils className="h-3 w-3" /> Fasting
-                        </div>
-                      )}
-                    </div>
+            {/* Image Container with Fixed Aspect Ratio to prevent cropping */}
+            {item.image && (
+              <div className="relative aspect-[16/10] w-full overflow-hidden sm:aspect-[16/9]">
+                <img
+                  src={item.image}
+                  alt={item.name}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                />
+                {/* Refined gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+                
+                {/* Price Badge over Image on Mobile/Desktop */}
+                <div className="absolute bottom-4 right-4 z-10">
+                  <div className="flex items-center gap-1.5 rounded-2xl bg-white/90 px-3 py-1.5 backdrop-blur-md shadow-lg border border-white/20">
+                     <span className="text-[10px] font-black text-primary opacity-60">ETB</span>
+                     <span className="text-sm font-black text-foreground">{item.price.toLocaleString("en-ET")}</span>
                   </div>
-                  
-                  {/* Universal Price Badge (Visible on Desktop & Mobile) */}
-                  <span className="shrink-0 rounded-full bg-primary/10 pl-1.5 pr-3 py-1 text-sm font-bold text-primary flex items-center gap-2 h-fit">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] font-extrabold tracking-wide text-primary-foreground">ETB</span>
-                    {item.price.toLocaleString("en-ET", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                  </span>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex flex-1 flex-col p-6 sm:p-8">
+              <div className="mb-4">
+                <div className="flex items-start justify-between gap-4">
+                  <h4 className="font-serif text-xl font-extrabold leading-tight text-foreground transition-colors group-hover:text-primary sm:text-2xl">
+                    {item.name}
+                  </h4>
                 </div>
                 
-                {item.description && (
-                  <p className="mb-5 mt-1 text-sm leading-relaxed text-muted-foreground/90 font-medium">
-                    {item.description}
-                  </p>
-                )}
-                
-                <div className="mt-auto pt-2">
-                  {item.extras.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {item.extras.map((ex, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-1.5 rounded-full border border-border/60 bg-secondary/60 px-3 py-1 text-xs font-semibold text-foreground transition-colors group-hover:border-border"
-                        >
-                          <span className="opacity-70">+ {ex.name}</span>
-                          <span className="text-primary">{formatPrice(ex.price)}</span>
-                        </div>
-                      ))}
-                    </div>
+                {/* Dietary Badges */}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {isSpicy && (
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-red-500/10 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-red-600">
+                      <Flame className="h-3 w-3" /> Spicy
+                    </span>
+                  )}
+                  {isVegan && (
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-emerald-600">
+                      <Leaf className="h-3 w-3" /> Vegan
+                    </span>
+                  )}
+                  {isGF && (
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-amber-500/10 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-amber-600">
+                      <Wheat className="h-3 w-3" /> GF
+                    </span>
+                  )}
+                  {isFasting && (
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-cyan-500/10 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-cyan-600">
+                      <Utensils className="h-3 w-3" /> Fasting
+                    </span>
                   )}
                 </div>
               </div>
+
+              {item.description && (
+                <p className="mb-6 text-sm font-medium leading-relaxed text-muted-foreground/80 line-clamp-3">
+                  {item.description}
+                </p>
+              )}
+
+              {/* Extras Section */}
+              {item.extras.length > 0 && (
+                <div className="mt-auto border-t border-border/40 pt-5">
+                  <div className="flex flex-wrap gap-1.5">
+                    {item.extras.map((ex, i) => (
+                      <div
+                        key={i}
+                        className="rounded-lg bg-secondary/40 px-2.5 py-1 text-[10px] font-bold text-muted-foreground border border-transparent transition-all group-hover:border-border/50 group-hover:bg-white"
+                      >
+                        <span className="opacity-60">+ {ex.name}</span>
+                        <span className="ml-1.5 text-primary">+{ex.price}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </li>
         );

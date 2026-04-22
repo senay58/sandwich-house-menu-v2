@@ -1377,10 +1377,14 @@ export function useMenu(): {
   skipSync: () => void;
 } {
   const [data, setData] = useState<MenuData>(loadMenuLocal());
-  const [isLoading, setIsLoading] = useState(true);
+  // Zero-Wait Loading: Don't show loading screen if we have local data already
+  const [isLoading, setIsLoading] = useState(() => {
+    const local = loadMenuLocal();
+    return !(local.categories.length > 0 || local.items.length > 0);
+  });
   const [cloudStatus, setCloudStatus] = useState<"online" | "offline" | "connecting">("connecting");
 
-  const pull = useCallback(async () => {
+  const pull = useCallback(async (isInitial = false) => {
     try {
       const cloud = await fetchMenuCloud();
       if (cloud) {
@@ -1393,13 +1397,14 @@ export function useMenu(): {
     } catch {
       setCloudStatus("offline");
     } finally {
-      setIsLoading(false);
+      // Small delay on initial load to prevent flickering if cloud is instant
+      if (isInitial) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    // 1. Initial Pull
-    pull();
+    // Initial Pull in background
+    pull(true);
 
     // 2. Realtime Subscriptions
     let itemSub: any = null;
@@ -1426,22 +1431,19 @@ export function useMenu(): {
   }, [pull]);
 
   const update = async (next: MenuData) => {
+    // 1. Optimistic UI update (Instant)
     setData(next);
     saveMenuLocal(next);
     
-    // Attempt cloud save
-    try {
-      const success = await saveMenuCloud(next);
-      if (success) {
-        setCloudStatus("online");
-      } else {
-        // If it fails but doesn't throw (e.g. timeout returned false)
-        setCloudStatus("offline");
-      }
-    } catch (err) {
-      console.warn("Update cloud sync failed:", err);
+    // 2. Background cloud save (Non-blocking)
+    // We don't 'await' this so the caller (Admin UI) can minimize/close instantly
+    saveMenuCloud(next).then(success => {
+      if (success) setCloudStatus("online");
+      else setCloudStatus("offline");
+    }).catch(err => {
+      console.warn("Background cloud sync failed:", err);
       setCloudStatus("offline");
-    }
+    });
   };
 
   const migrateToCloud = async () => {
