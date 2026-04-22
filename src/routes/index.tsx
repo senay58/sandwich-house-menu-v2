@@ -146,10 +146,15 @@ function MenuPage() {
 
     if (activeItem && navContainer) {
       const updatePill = () => {
-        // Use transform: translate3d for smooth 60fps movement
+        const itemRect = activeItem.getBoundingClientRect();
+        const containerRect = navContainer.getBoundingClientRect();
+        
+        // Calculate position relative to the scrollable container
+        const left = itemRect.left - containerRect.left + navContainer.scrollLeft;
+        
         setPillStyle({
-          width: activeItem.offsetWidth,
-          left: activeItem.offsetLeft,
+          width: itemRect.width,
+          left: left,
           opacity: 1
         });
       };
