@@ -146,15 +146,9 @@ function MenuPage() {
 
     if (activeItem && navContainer) {
       const updatePill = () => {
-        const itemRect = activeItem.getBoundingClientRect();
-        const containerRect = navContainer.getBoundingClientRect();
-        
-        // Calculate position relative to the scrollable container
-        const left = itemRect.left - containerRect.left + navContainer.scrollLeft;
-        
         setPillStyle({
-          width: itemRect.width,
-          left: left,
+          width: activeItem.offsetWidth,
+          left: activeItem.offsetLeft,
           opacity: 1
         });
       };
@@ -283,7 +277,7 @@ function MenuPage() {
               >
                 {/* Hardware Accelerated Sliding Pill Background */}
                 <div 
-                  className="absolute top-3 bottom-0 h-10 rounded-full bg-primary shadow-md shadow-primary/30 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+                  className="absolute left-0 top-3 bottom-0 h-10 rounded-full bg-primary shadow-md shadow-primary/30 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
                   style={{
                     width: `${pillStyle.width}px`,
                     transform: `translate3d(${pillStyle.left}px, 0, 0)`,
