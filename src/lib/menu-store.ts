@@ -1373,10 +1373,15 @@ export function useMenu(): {
   update: (d: MenuData) => Promise<void>; 
   isLoading: boolean;
   cloudStatus: "online" | "offline" | "connecting";
+  lastSynced: Date | null;
   migrateToCloud: () => Promise<void>;
   skipSync: () => void;
 } {
   const [data, setData] = useState<MenuData>(loadMenuLocal());
+  const [lastSynced, setLastSynced] = useState<Date | null>(() => {
+    const saved = localStorage.getItem("sandwich_house_last_sync");
+    return saved ? new Date(saved) : null;
+  });
   // Zero-Wait Loading: Don't show loading screen if we have local data already
   const [isLoading, setIsLoading] = useState(() => {
     const local = loadMenuLocal();
@@ -1435,11 +1440,19 @@ export function useMenu(): {
     setData(next);
     saveMenuLocal(next);
     
-    // 2. Background cloud save (Non-blocking)
-    // We don't 'await' this so the caller (Admin UI) can minimize/close instantly
+    // 2. Clear visual cues
+    setCloudStatus("connecting");
+    
+    // 3. Background cloud save (Non-blocking)
     saveMenuCloud(next).then(success => {
-      if (success) setCloudStatus("online");
-      else setCloudStatus("offline");
+      if (success) {
+        setCloudStatus("online");
+        const now = new Date();
+        setLastSynced(now);
+        localStorage.setItem("sandwich_house_last_sync", now.toISOString());
+      } else {
+        setCloudStatus("offline");
+      }
     }).catch(err => {
       console.warn("Background cloud sync failed:", err);
       setCloudStatus("offline");
@@ -1463,5 +1476,5 @@ export function useMenu(): {
      setCloudStatus("offline");
   };
 
-  return { data, update, isLoading, cloudStatus, migrateToCloud, skipSync };
+  return { data, update, isLoading, cloudStatus, lastSynced, migrateToCloud, skipSync };
 }

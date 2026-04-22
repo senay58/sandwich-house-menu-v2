@@ -8,7 +8,7 @@ import {
   useMenu,
 } from "@/lib/menu-store";
 import { Plus, ChevronUp, ChevronDown, Edit2, Trash2, ArrowLeft, Settings2, Image as ImageIcon, UploadCloud, QrCode, Download, Database, CloudDownload, CloudUpload, EyeOff, LayoutDashboard, Tag, Coffee, Settings, LogOut, Menu, X, ShieldCheck, Key, Lock, Check, Cloud, RefreshCw } from "lucide-react";
-import { compressImage, fetchPasscodeCloud, savePasscodeCloud, deleteItemCloud, deleteCategoryCloud, testConnectionCloud } from "@/lib/menu-store";
+import { fetchPasscodeCloud, savePasscodeCloud, deleteItemCloud, deleteCategoryCloud, testConnectionCloud } from "@/lib/menu-store";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/admin")({
 });
 
 function AdminPage() {
-  const { data, update, isLoading, cloudStatus, migrateToCloud, skipSync } = useMenu();
+  const { data, update, isLoading, cloudStatus, lastSynced, migrateToCloud, skipSync } = useMenu();
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("sandwich_house_admin_auth") === "true";
@@ -591,24 +591,49 @@ function AdminPage() {
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/30 p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
-                  <div className={`rounded-full p-4 ${cloudStatus === "online" ? "bg-green-500/10 text-green-500" : "bg-orange-500/10 text-orange-500"}`}>
+                  <div className={`rounded-full p-4 ${
+                    cloudStatus === "online" ? "bg-green-500/10 text-green-500" : 
+                    cloudStatus === "connecting" ? "bg-blue-500/10 text-blue-500" :
+                    "bg-orange-500/10 text-orange-500"
+                  }`}>
                     <LayoutDashboard className="h-6 w-6" />
                   </div>
                   <div>
                     <h3 className="font-serif text-xl font-bold text-foreground">System Status</h3>
                     <div className="mt-1 flex items-center gap-2">
-                       <div className={`h-2.5 w-2.5 rounded-full ${cloudStatus === "online" ? "bg-green-500 animate-pulse" : "bg-orange-500"}`}></div>
+                       <div className={`h-2.5 w-2.5 rounded-full ${
+                         cloudStatus === "online" ? "bg-green-500 animate-pulse" : 
+                         cloudStatus === "connecting" ? "bg-blue-500 animate-spin" :
+                         "bg-orange-500"
+                       }`}></div>
                        <span className="text-sm font-bold uppercase tracking-tight">
-                         {cloudStatus === "online" ? "Cloud Connected (Live Sync)" : "Local Storage Mode"}
+                         {cloudStatus === "online" ? "Cloud Connected (Live Sync)" : 
+                          cloudStatus === "connecting" ? "Connecting to Cloud..." :
+                          "Local Storage Mode"}
                        </span>
                     </div>
+                    {lastSynced && (
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        Last synced: {lastSynced.toLocaleString()}
+                      </p>
+                    )}
                   </div>
                 </div>
                 {cloudStatus === "offline" && (
-                   <div className="text-xs font-medium text-muted-foreground text-center md:text-right max-w-[200px]">
-                      Your phone won't see updates made in Local Storage Mode. 
+                   <div className="text-xs font-medium text-destructive/80 text-center md:text-right max-w-[200px] animate-pulse">
+                      Your phone won't see updates made in Local Storage Mode! Try "Test Connection" below.
                    </div>
                 )}
+                {cloudStatus === "connecting" && (
+                   <div className="text-xs font-medium text-blue-500 text-center md:text-right animate-pulse">
+                      Pushing changes to your phone...
+                   </div>
+                )}
+                {cloudStatus === "online" && (
+                   <div className="text-xs font-medium text-green-500 text-center md:text-right">
+                      Phone is up to date 🎉
+                    </div>
+                 )}
               </section>
 
                <section className="rounded-3xl border border-border/60 bg-gradient-to-br from-card to-secondary/30 p-8 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
@@ -626,19 +651,39 @@ function AdminPage() {
                 <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
                    <button
                     onClick={async () => {
-                      const res = await testConnectionCloud();
-                      alert(res.success ? "✅ " + res.message : "❌ Connection Failed: " + res.message);
+                      setCloudStatus("connecting");
+                      const success = await saveMenuCloud(data);
+                      if (success) {
+                        setCloudStatus("online");
+                        setLastSynced(new Date());
+                        alert("✅ Connected & Synced Successfully! Your phone is now up to date.");
+                      } else {
+                        setCloudStatus("offline");
+                        alert("❌ Sync Failed. Please check your internet or try reducing photo sizes.");
+                      }
                     }}
                     className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl border border-border/80 bg-white px-6 py-3 text-sm font-bold text-foreground shadow-sm transition-transform hover:scale-[1.02] active:scale-95"
                   >
                     <RefreshCw className="h-4 w-4" />
-                    Test Connection
+                    Test & Sync
                   </button>
                   <button
-                    onClick={syncToCloud}
-                    className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-blue-500 px-6 py-3 text-sm font-bold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-95"
+                    onClick={async () => {
+                      if (!confirm("This will overwrite your phone's menu with your laptop's menu. Proceed?")) return;
+                      setCloudStatus("connecting");
+                      const success = await saveMenuCloud(data);
+                      if (success) {
+                        setCloudStatus("online");
+                        setLastSynced(new Date());
+                        alert("✅ Cloud Sync Complete! Your phone is now updated.");
+                      } else {
+                        setCloudStatus("offline");
+                        alert("❌ Cloud Sync Failed.");
+                      }
+                    }}
+                    className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition-transform hover:scale-[1.02] active:scale-95"
                   >
-                    <CloudUpload className="h-4 w-4" />
+                    <Cloud className="h-4 w-4" />
                     Push Local to Cloud
                   </button>
                 </div>
@@ -1029,6 +1074,27 @@ function CategoryDialog({ value, topCategories, onSave, onCancel }: any) {
 }
 
 const TAG_OPTIONS = ["Spicy", "Vegan", "Gluten-Free", "Fasting"];
+
+const compressImage = (base64Str: string, maxWidth = 1024): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = (maxWidth * height) / width;
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx?.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", 0.7));
+    };
+  });
+};
 
 function ItemDialog({ value, categories, onSave, onCancel }: any) {
   const [item, setItem] = useState<MenuItem>({
