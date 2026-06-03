@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "./supabase";
 
 export type Extra = { name: string; price: number };
@@ -1379,6 +1379,7 @@ export function useMenu(): {
 } {
   const [data, setData] = useState<MenuData>(loadMenuLocal());
   const [lastSynced, setLastSynced] = useState<Date | null>(() => {
+    if (typeof window === "undefined") return null;
     const saved = localStorage.getItem("sandwich_house_last_sync");
     return saved ? new Date(saved) : null;
   });
@@ -1388,6 +1389,8 @@ export function useMenu(): {
     return !(local.categories.length > 0 || local.items.length > 0);
   });
   const [cloudStatus, setCloudStatus] = useState<"online" | "offline" | "connecting">("connecting");
+  const isUpdatingRef = useRef(false);
+  const pullTimeoutRef = useRef<any>(null);
 
   const pull = useCallback(async (isInitial = false) => {
     try {
@@ -1407,6 +1410,16 @@ export function useMenu(): {
     }
   }, []);
 
+  const debouncedPull = useCallback(() => {
+    if (isUpdatingRef.current) return;
+    if (pullTimeoutRef.current) clearTimeout(pullTimeoutRef.current);
+    pullTimeoutRef.current = setTimeout(() => {
+      if (!isUpdatingRef.current) {
+        pull();
+      }
+    }, 1500);
+  }, [pull]);
+
   useEffect(() => {
     // Initial Pull in background
     pull(true);
@@ -1416,8 +1429,8 @@ export function useMenu(): {
     try {
       itemSub = supabase
         .channel("menu_changes")
-        .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => pull())
-        .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => pull())
+        .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, () => debouncedPull())
+        .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, () => debouncedPull())
         .subscribe((status) => {
            if (status === "TIMED_OUT" || status === "CLOSED") setCloudStatus("offline");
         });
@@ -1432,10 +1445,12 @@ export function useMenu(): {
     return () => {
       if (itemSub) itemSub.unsubscribe();
       window.removeEventListener(EVENT, onChange);
+      if (pullTimeoutRef.current) clearTimeout(pullTimeoutRef.current);
     };
-  }, [pull]);
+  }, [pull, debouncedPull]);
 
   const update = async (next: MenuData) => {
+    isUpdatingRef.current = true;
     // 1. Optimistic UI update (Instant)
     setData(next);
     saveMenuLocal(next);
@@ -1449,25 +1464,38 @@ export function useMenu(): {
         setCloudStatus("online");
         const now = new Date();
         setLastSynced(now);
-        localStorage.setItem("sandwich_house_last_sync", now.toISOString());
+        if (typeof window !== "undefined") {
+          localStorage.setItem("sandwich_house_last_sync", now.toISOString());
+        }
       } else {
         setCloudStatus("offline");
       }
     }).catch(err => {
       console.warn("Background cloud sync failed:", err);
       setCloudStatus("offline");
+    }).finally(() => {
+      setTimeout(() => {
+        isUpdatingRef.current = false;
+      }, 2000);
     });
   };
 
   const migrateToCloud = async () => {
+    isUpdatingRef.current = true;
     const local = loadMenuLocal();
-    const success = await saveMenuCloud(local);
-    if (success) {
-      setCloudStatus("online");
-      await pull();
-    } else {
-      setCloudStatus("offline");
-      throw new Error("Could not reach the cloud. Please check your internet.");
+    try {
+      const success = await saveMenuCloud(local);
+      if (success) {
+        setCloudStatus("online");
+        await pull();
+      } else {
+        setCloudStatus("offline");
+        throw new Error("Could not reach the cloud. Please check your internet.");
+      }
+    } finally {
+      setTimeout(() => {
+        isUpdatingRef.current = false;
+      }, 2000);
     }
   };
 
