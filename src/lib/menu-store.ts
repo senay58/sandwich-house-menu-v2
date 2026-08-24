@@ -38,10 +38,6 @@ const EVENT = "sandwich-house-menu-change";
 const DEFAULT_DATA: MenuData = {
   "categories": [
     {
-      "id": "cat-fasting",
-      "name": "Fasting"
-    },
-    {
       "id": "cat-breakfast",
       "name": "Breakfast"
     },
@@ -94,6 +90,10 @@ const DEFAULT_DATA: MenuData = {
     {
       "id": "cat-extras",
       "name": "Extras"
+    },
+    {
+      "id": "cat-fasting",
+      "name": "Fasting"
     }
   ],
   "items": [

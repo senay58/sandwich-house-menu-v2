@@ -108,20 +108,22 @@ function MenuPage() {
     });
   }, [topCategories, itemsByCat, subCategoriesByParent]);
 
+  // Keep a ref so the observer can read the latest activeCat without it being a dep
+  const activeCatRef = useRef(activeCat);
+  useEffect(() => { activeCatRef.current = activeCat; }, [activeCat]);
+
   // Handle active category updates from scrolling
   useEffect(() => {
     // Give the page 600ms to settle before the observer starts overriding activeCat.
-    // This prevents the first-load race where all sections fire at once and the
-    // observer incorrectly picks a section near the bottom (e.g. Fasting).
+    // This prevents the first-load race where all sections fire at once.
     let settled = false;
     const settleTimer = setTimeout(() => { settled = true; }, 600);
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (!settled) return;          // ← ignore early fires during hydration
+        if (!settled) return;
         if (isNavigating.current) return;
 
-        // Only look at sections entering the viewport
         const visibleEntries = entries.filter((e) => e.isIntersecting);
         if (visibleEntries.length === 0) return;
 
@@ -130,7 +132,7 @@ function MenuPage() {
           curr.boundingClientRect.top < prev.boundingClientRect.top ? curr : prev
         );
 
-        if (active && active.target.id !== activeCat) {
+        if (active && active.target.id !== activeCatRef.current) {
           setActiveCat(active.target.id);
         }
       },
@@ -152,7 +154,9 @@ function MenuPage() {
       observer.disconnect();
       window.removeEventListener("scroll", handleScroll);
     };
-  }, [visibleTopCategories, activeCat]);
+  // ↓ activeCat intentionally excluded — we use activeCatRef instead
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleTopCategories]);
 
   // Butter-Smooth Horizontal Pill Motion (Hardware Accelerated)
   useLayoutEffect(() => {
