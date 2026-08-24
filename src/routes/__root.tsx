@@ -29,21 +29,26 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Sandwich House" },
-      { name: "description", content: "Fresh, hand-crafted sandwiches. Browse our menu." },
-      { name: "author", content: "Sandwich House" },
-      { property: "og:title", content: "Sandwich House" },
-      { property: "og:description", content: "Fresh, hand-crafted sandwiches. Browse our menu." },
+      { title: "Fana Kitchen" },
+      { name: "description", content: "Fresh, vibrant, and delicious. Browse our digital menu." },
+      { name: "author", content: "Fana Kitchen" },
+      { property: "og:title", content: "Fana Kitchen" },
+      { property: "og:description", content: "Fresh, vibrant, and delicious. Browse our digital menu." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:site", content: "@FanaKitchen" },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      // Preload the hero image so it paints immediately (LCP)
+      { rel: "preload", href: "/fanakitchen-logo.webp", as: "image", type: "image/webp" },
+      // Load fonts non-blocking: media=print swaps to all once loaded
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@600;700&display=swap",
+        media: "print",
+        onLoad: "this.media='all'",
       },
       {
         rel: "stylesheet",

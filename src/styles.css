@@ -5,13 +5,13 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Premium Design System 
- * Typography: Playfair Display for headings, Inter for body
- * Palette: "Architectural White" & "Deep Forest Green"
+ * Fana Kitchen Design System 
+ * Typography: Poppins for headings, Inter for body
+ * Palette: Fresh Greens, Yellow accents, and Crisp Whites
  */
 
 @theme inline {
-  --font-serif: "Playfair Display", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-serif: "Poppins", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   
   --radius-sm: calc(var(--radius) - 4px);
@@ -46,39 +46,39 @@
 :root {
   --radius: 1rem;
 
-  /* ── Ultra-premium Light Palette with Deep Dark Greens ── */
-  --background: oklch(0.99 0.002 145);      /* Crisp, barely off-white */
-  --foreground: oklch(0.20 0.03 145);       /* Deep, sophisticated forest-charcoal */
+  /* ── Deep Forest Green Palette ── */
+  --background: oklch(0.99 0.005 140);       /* Crisp white with barely-there green tint */
+  --foreground: oklch(0.18 0.06 145);        /* Very dark forest green for text */
   
-  --card: oklch(1 0 0);                     /* Pure white */
-  --card-foreground: oklch(0.20 0.03 145);
+  --card: oklch(1 0 0);                      /* Pure white for cards */
+  --card-foreground: oklch(0.18 0.06 145);
   
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.20 0.03 145);
+  --popover-foreground: oklch(0.18 0.06 145);
   
-  --primary: oklch(0.28 0.08 145);           /* Much darker, richer forest green */
-  --primary-foreground: oklch(0.99 0.01 145); /* Elegant light cream */
+  --primary: oklch(0.38 0.14 145);           /* Deep forest green */
+  --primary-foreground: oklch(0.98 0.01 110); /* White/cream text on primary */
   
-  --secondary: oklch(0.96 0.01 145);        /* Soft, very light sage */
-  --secondary-foreground: oklch(0.30 0.08 145);
+  --secondary: oklch(0.95 0.03 140);         /* Soft, light sage */
+  --secondary-foreground: oklch(0.25 0.10 145);
   
-  --muted: oklch(0.96 0.01 145);
-  --muted-foreground: oklch(0.55 0.04 145);
+  --muted: oklch(0.96 0.02 140);
+  --muted-foreground: oklch(0.50 0.06 145);
   
-  --accent: oklch(0.35 0.12 145);           /* Emerald green, dark but vibrant */
-  --accent-foreground: oklch(0.99 0.01 145);
+  --accent: oklch(0.48 0.18 145);            /* Rich vibrant green accent */
+  --accent-foreground: oklch(0.98 0.01 110);
   
-  --destructive: oklch(0.55 0.15 25);
+  --destructive: oklch(0.60 0.18 25);
   --destructive-foreground: oklch(0.99 0.01 0);
   
-  --border: oklch(0.92 0.01 145);
-  --input: oklch(0.96 0.01 145);
-  --ring: oklch(0.28 0.08 145);
+  --border: oklch(0.90 0.03 140);
+  --input: oklch(0.95 0.02 140);
+  --ring: oklch(0.38 0.14 145);              /* Deep forest green */
 
-  /* Deep, striking dark green gradient for hero areas */
-  --gradient-hero: linear-gradient(135deg, oklch(0.18 0.05 145), oklch(0.28 0.08 145), oklch(0.22 0.06 148));
+  /* Deep forest green gradient for hero areas */
+  --gradient-hero: linear-gradient(135deg, oklch(0.25 0.10 145), oklch(0.38 0.14 145), oklch(0.48 0.18 145));
   
-  --shadow-card: 0 10px 40px -10px oklch(0.2 0.05 145 / 0.1); 
+  --shadow-card: 0 10px 40px -10px oklch(0.25 0.10 145 / 0.15); 
 }
 
 /* Base resets & typography applications */

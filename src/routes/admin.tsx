@@ -13,8 +13,8 @@ import { fetchPasscodeCloud, savePasscodeCloud, deleteItemCloud, deleteCategoryC
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Admin — SANDWICH HOUSE" },
-      { name: "description", content: "Manage the Sandwich House menu." },
+      { title: "Admin — Fana Kitchen" },
+      { name: "description", content: "Manage the Fana Kitchen menu." },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),
@@ -439,21 +439,19 @@ function AdminPage() {
       <aside className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-border/40 bg-card/90 backdrop-blur-2xl transition-transform duration-300 md:sticky md:top-0 md:h-screen md:translate-x-0 md:bg-card/60 ${
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       }`}>
-        <div className="flex items-center justify-between p-6">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl border border-border/50 bg-white p-1.5 shadow-sm">
-              <img src="/logo.png" alt="logo" className="h-8 w-8 object-contain" />
-            </div>
-            <div>
-              <h1 className="font-serif text-sm font-bold tracking-tight text-foreground uppercase">
-                Sandwich House
-              </h1>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Admin Domain</p>
-            </div>
+        <div className="relative pt-6 pb-4 px-6 flex flex-col items-center">
+          <div className="w-full flex justify-center mb-4">
+            <img src="/fanakitchen-logo.webp" alt="logo" className="w-full h-auto max-w-[160px] object-contain drop-shadow-sm" />
+          </div>
+          <div className="text-center">
+            <h1 className="font-serif text-lg font-bold tracking-tight text-foreground uppercase">
+              Fana Kitchen
+            </h1>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Admin Domain</p>
           </div>
           <button 
             onClick={() => setIsSidebarOpen(false)}
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary md:hidden"
+            className="absolute top-4 right-4 rounded-lg p-1.5 text-muted-foreground hover:bg-secondary md:hidden"
           >
             <X className="h-5 w-5" />
           </button>
@@ -631,7 +629,7 @@ function AdminPage() {
                 )}
                 {cloudStatus === "online" && (
                    <div className="text-xs font-medium text-green-500 text-center md:text-right">
-                      Phone is up to date 🎉
+                      Phone is up to date
                     </div>
                  )}
               </section>
@@ -1100,6 +1098,7 @@ function ItemDialog({ value, categories, onSave, onCancel }: any) {
   const [item, setItem] = useState<MenuItem>({
     ...value,
     available: value.available !== false,
+    isSpecial: value.isSpecial === true,
     tags: value.tags || []
   });
   const [isDragging, setIsDragging] = useState(false);
@@ -1142,10 +1141,26 @@ function ItemDialog({ value, categories, onSave, onCancel }: any) {
           </button>
         </div>
 
+        {/* Today's Special Toggle */}
+        <div className="flex items-center justify-between rounded-2xl border border-primary/30 bg-primary/5 p-4 shadow-sm">
+          <div>
+            <h4 className="font-bold text-foreground">Today's Special</h4>
+            <p className="text-xs font-medium text-muted-foreground mt-0.5">When enabled, this item appears in the featured specials carousel on the menu.</p>
+          </div>
+          <button
+            onClick={() => update("isSpecial", !item.isSpecial)}
+            className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 outline-none focus:ring-4 focus:ring-primary/20 ${
+              item.isSpecial ? "bg-primary" : "bg-border"
+            }`}
+          >
+            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${item.isSpecial ? "translate-x-5" : "translate-x-0"}`} />
+          </button>
+        </div>
+
         <Field label="Name">
           <input value={item.name} onChange={(e) => update("name", e.target.value)} placeholder="e.g. Classic BLT" className={inputClassName} />
         </Field>
-        
+
         <Field label="Description & Ingredients">
           <textarea value={item.description} onChange={(e) => update("description", e.target.value)} rows={2} placeholder="Crispy bacon, lettuce, tomato..." className={inputClassName} />
         </Field>
@@ -1233,3 +1248,4 @@ function ItemDialog({ value, categories, onSave, onCancel }: any) {
     </Modal>
   );
 }
+

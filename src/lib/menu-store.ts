@@ -13,6 +13,7 @@ export type MenuItem = {
   extras: Extra[];
   available?: boolean; // false means out of stock/hidden
   tags?: string[]; // "Spicy", "Vegan", "Gluten-Free", "Fasting"
+  isSpecial?: boolean; // true means featured in Today's Specials carousel
 };
 
 export type Category = {
@@ -1226,17 +1227,21 @@ export async function fetchMenuCloud(): Promise<MenuData | null> {
         name: c.name, 
         parentId: c.parent_id 
       })),
-      items: items.map(i => ({
-        id: i.id,
-        name: i.name,
-        description: i.description || "",
-        price: Number(i.price),
-        categoryId: i.category_id,
-        image: i.image || "",
-        extras: Array.isArray(i.extras) ? i.extras : [],
-        available: i.available !== false,
-        tags: i.tags || []
-      }))
+      items: items.map(i => {
+        const rawTags = i.tags || [];
+        return {
+          id: i.id,
+          name: i.name,
+          description: i.description || "",
+          price: Number(i.price),
+          categoryId: i.category_id,
+          image: i.image || "",
+          extras: Array.isArray(i.extras) ? i.extras : [],
+          available: i.available !== false,
+          isSpecial: rawTags.includes("__SPECIAL__"),
+          tags: rawTags.filter((t: string) => t !== "__SPECIAL__")
+        };
+      })
     };
   } catch (err) {
     console.warn("Cloud Fetch Failed (Timeout or Network):", err);
@@ -1266,18 +1271,24 @@ export async function saveMenuCloud(data: MenuData) {
     }));
 
     // 2. Prepare Items
-    const itemsToUpsert = data.items.map((i, idx) => ({
-      id: i.id,
-      name: i.name,
-      description: i.description || "",
-      price: i.price,
-      category_id: i.categoryId,
-      image: i.image || "",
-      extras: i.extras || [],
-      available: i.available !== false,
-      tags: i.tags || [],
-      sort_order: idx
-    }));
+    const itemsToUpsert = data.items.map((i, idx) => {
+      const tags = [...(i.tags || [])];
+      if (i.isSpecial && !tags.includes("__SPECIAL__")) {
+        tags.push("__SPECIAL__");
+      }
+      return {
+        id: i.id,
+        name: i.name,
+        description: i.description || "",
+        price: i.price,
+        category_id: i.categoryId,
+        image: i.image || "",
+        extras: i.extras || [],
+        available: i.available !== false,
+        tags: tags,
+        sort_order: idx
+      };
+    });
 
     // Start by syncing categories so foreign keys on items work
     const { error: catError } = await withTimeout(supabase.from("categories").upsert(categoriesToUpsert));
@@ -1320,7 +1331,7 @@ export function loadMenuLocal(): MenuData {
     const parsed = JSON.parse(raw) as MenuData;
     return {
       categories: parsed.categories || [],
-      items: (parsed.items || []).map(i => ({ ...i, available: i.available !== false, tags: i.tags || [] }))
+      items: (parsed.items || []).map(i => ({ ...i, available: i.available !== false, tags: i.tags || [], isSpecial: i.isSpecial === true }))
     };
   } catch {
     return DEFAULT_DATA;

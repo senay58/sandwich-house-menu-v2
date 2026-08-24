@@ -1,16 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useMenu, formatPrice } from "@/lib/menu-store";
+import { useMenu, formatPrice, type MenuItem } from "@/lib/menu-store";
 import { Leaf, Flame, Sparkles, ChefHat, Search, X, Wheat, Utensils } from "lucide-react";
 
 export const Route = createFileRoute("/")(({
   head: () => ({
     meta: [
-      { title: "SANDWICH HOUSE — Fresh, hand-crafted sandwiches" },
+      { title: "Fana Kitchen — Fresh, vibrant, and delicious" },
       {
         name: "description",
         content:
-          "Browse the Sandwich House menu: classics, signature, sides and drinks. Made fresh, served fast.",
+          "Browse the Fana Kitchen menu: classics, signature, sides and drinks. Made fresh, served fast.",
       },
     ],
   }),
@@ -21,6 +21,7 @@ function MenuPage() {
   const { data, isLoading } = useMenu();
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortOrder, setSortOrder] = useState<"default" | "asc" | "desc">("default");
   
   // Refs for tracking sections and the nav container
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -52,9 +53,9 @@ function MenuPage() {
     if (!activeCat && topCategories[0]) setActiveCat(topCategories[0].id);
   }, [topCategories, activeCat, searchQuery]);
 
-  // Filtered items based on availability and search
+  // Filtered items based on availability, search, and sorting
   const filteredItems = useMemo(() => {
-    return data.items.filter(item => {
+    let result = data.items.filter(item => {
       const isAvailable = item.available !== false;
       if (!isAvailable) return false;
       
@@ -67,7 +68,15 @@ function MenuPage() {
         (item.tags || []).some(tag => tag.toLowerCase().includes(searchLower))
       );
     });
-  }, [data.items, searchQuery]);
+
+    if (sortOrder === "asc") {
+      result.sort((a, b) => a.price - b.price);
+    } else if (sortOrder === "desc") {
+      result.sort((a, b) => b.price - a.price);
+    }
+
+    return result;
+  }, [data.items, searchQuery, sortOrder]);
 
   const itemsByCat = useMemo(() => {
     const map: Record<string, MenuItem[]> = {};
@@ -207,46 +216,29 @@ function MenuPage() {
         <div className="absolute bottom-[-10%] left-[20%] h-[40vh] w-[40vw] rounded-full bg-primary/5 blur-[120px]"></div>
       </div>
 
-      {/* ── Elegant Dark Green Hero Section ── */}
-      <header className="relative flex flex-col items-center justify-center overflow-hidden py-24 px-6 sm:py-32 animate-in fade-in slide-in-from-top-4 duration-1000">
-        
-        {/* Fixed Hero Gradient Background - defined directly using Tailwind classes to ensure it renders */}
-        <div className="absolute inset-0 z-0 bg-gradient-to-br from-[#102a1b] via-[#0d2a1b] to-[#153424]"></div>
-        
-        {/* Inner glow effect */}
-        <div className="absolute inset-0 z-0 bg-black/20"></div>
-
-        {/* Fusion gradient: blends the bottom of the dark hero smoothly into the white background */}
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent z-10"></div>
-
-        <div className="relative z-20 flex flex-col items-center text-center max-w-3xl mx-auto">
-          {/* Logo container: made border thicker */}
-          <div className="mb-10 overflow-hidden rounded-[2rem] border-4 border-white/90 shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-transform duration-500 hover:scale-105">
-            <img
-              src="/logo.png"
-              alt="SANDWICH HOUSE logo"
-              className="h-32 w-32 object-cover sm:h-40 sm:w-40"
-            />
-          </div>
-          <h1 className="font-serif text-4xl font-bold tracking-wider text-[#eaf2ed] sm:text-6xl md:text-7xl mb-5 drop-shadow-xl">
-            SANDWICH HOUSE
-          </h1>
-          <div className="flex items-center gap-4 text-xs sm:text-sm font-semibold tracking-[0.25em] text-white/80 uppercase drop-shadow-md">
-            <span>Fresh</span>
-            <span className="h-1.5 w-1.5 rounded-full bg-[#3db16e] shadow-[0_0_12px_#3db16e]"></span>
-            <span>Hand-Crafted</span>
-            <span className="h-1.5 w-1.5 rounded-full bg-[#3db16e] shadow-[0_0_12px_#3db16e]"></span>
-            <span>Daily</span>
-          </div>
-        </div>
+      {/* ── Logo Hero — pure image wash ── */}
+      <header className="relative w-full overflow-hidden">
+        <picture>
+          <source srcSet="/fanakitchen-logo.webp" type="image/webp" />
+          <img
+            src="/fanakitchen logo.png"
+            alt="Fana Kitchen"
+            className="w-full object-cover object-top"
+            style={{ maxHeight: '80vw', minHeight: '260px' }}
+            fetchPriority="high"
+            decoding="async"
+          />
+        </picture>
+        {/* Bottom bleed into page */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent"></div>
       </header>
 
       {/* ── Sticky Search & Navigation Wrapper ── */}
       <div className="sticky top-0 z-[100] w-full">
         {/* Search Bar */}
         <div className="w-full border-b border-border/20 bg-background/80 backdrop-blur-xl transition-all">
-          <div className="mx-auto max-w-4xl px-4 py-3">
-            <div className="relative group">
+          <div className="mx-auto max-w-4xl px-4 py-3 flex gap-2">
+            <div className="relative group flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
               <input
                 type="text"
@@ -264,6 +256,17 @@ function MenuPage() {
                 </button>
               )}
             </div>
+            
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as any)}
+              className="rounded-2xl border border-border/50 bg-secondary/30 px-4 py-3 text-sm font-medium text-foreground focus:border-primary/50 focus:bg-background focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all appearance-none cursor-pointer hover:bg-secondary/60"
+              style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23102a1b%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.7rem top 50%', backgroundSize: '0.65rem auto', paddingRight: '2.5rem' }}
+            >
+              <option value="default">Sort: Default</option>
+              <option value="asc">Price: Low to High</option>
+              <option value="desc">Price: High to Low</option>
+            </select>
           </div>
         </div>
 
@@ -313,6 +316,9 @@ function MenuPage() {
         )}
       </div>
 
+      {/* ── Today's Specials Carousel ── */}
+      <SpecialsCarousel items={data.items.filter(i => i.isSpecial && i.available !== false)} />
+
       {/* ── Premium Content Grid ── */}
       <main className="mx-auto max-w-4xl px-4 pb-32 pt-8 sm:px-6 lg:px-8">
         {visibleTopCategories.length === 0 && (
@@ -354,7 +360,7 @@ function MenuPage() {
                 <h2 className="font-serif text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
                   {cat.name}
                 </h2>
-                <div className="mt-4 h-1.5 w-20 bg-accent rounded-full mx-auto sm:mx-0 shadow-sm"></div>
+                <div className="mt-4 h-1.5 w-20 bg-primary rounded-full mx-auto sm:mx-0 shadow-sm"></div>
               </div>
 
               {/* Subcategory In-Section Navigation Pills */}
@@ -409,11 +415,73 @@ function MenuPage() {
       <footer className="border-t border-border/50 bg-secondary/30 py-16 text-center text-sm font-medium text-muted-foreground relative overflow-hidden">
         <div className="absolute inset-0 top-0 h-full w-full bg-primary/5"></div>
         <div className="relative z-10">
-          <p className="font-serif text-xl text-foreground mb-3 font-semibold tracking-wider">SANDWICH HOUSE</p>
+          <p className="font-serif text-xl text-foreground mb-3 font-semibold tracking-wider">FANA KITCHEN</p>
           <p className="opacity-70">© {new Date().getFullYear()} All rights reserved. Crafted with care.</p>
         </div>
       </footer>
     </div>
+  );
+}
+
+function SpecialsCarousel({ items }: { items: MenuItem[] }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const indexRef = useRef(0);
+  const timerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (items.length <= 1) return;
+
+    const scroll = () => {
+      const track = trackRef.current;
+      if (!track) return;
+      indexRef.current = (indexRef.current + 1) % items.length;
+      const card = track.children[indexRef.current] as HTMLElement;
+      if (card) {
+        track.scrollTo({ left: card.offsetLeft, behavior: "smooth" });
+      }
+    };
+
+    timerRef.current = setInterval(scroll, 3000);
+    return () => clearInterval(timerRef.current);
+  }, [items.length]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <section className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 pt-8">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="h-5 w-1 rounded-full bg-primary"></div>
+        <h2 className="text-sm font-black uppercase tracking-[0.2em] text-primary">Today's Specials</h2>
+      </div>
+      <div
+        ref={trackRef}
+        className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2"
+      >
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className="snap-start shrink-0 w-64 sm:w-72 rounded-2xl border border-primary/20 bg-card shadow-md overflow-hidden flex flex-col"
+          >
+            {item.image ? (
+              <img src={item.image} alt={item.name} loading="lazy" decoding="async" className="h-36 w-full object-cover" />
+            ) : (
+              <div className="h-36 w-full bg-primary/10 flex items-center justify-center">
+                <Utensils className="h-8 w-8 text-primary/30" />
+              </div>
+            )}
+            <div className="p-4 flex-1 flex flex-col justify-between">
+              <div>
+                <p className="font-bold text-foreground text-sm leading-tight">{item.name}</p>
+                {item.description && (
+                  <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{item.description}</p>
+                )}
+              </div>
+              <p className="mt-3 text-sm font-black text-primary">{formatPrice(item.price)}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
