@@ -108,29 +108,36 @@ function MenuPage() {
     });
   }, [topCategories, itemsByCat, subCategoriesByParent]);
 
-  // Handle active category updates from scrolling - Ultra Stable Version
+  // Handle active category updates from scrolling
   useEffect(() => {
+    // Give the page 600ms to settle before the observer starts overriding activeCat.
+    // This prevents the first-load race where all sections fire at once and the
+    // observer incorrectly picks a section near the bottom (e.g. Fasting).
+    let settled = false;
+    const settleTimer = setTimeout(() => { settled = true; }, 600);
+
     const observer = new IntersectionObserver(
       (entries) => {
+        if (!settled) return;          // ← ignore early fires during hydration
         if (isNavigating.current) return;
-        
-        // Find all visible sections
+
+        // Only look at sections entering the viewport
         const visibleEntries = entries.filter((e) => e.isIntersecting);
         if (visibleEntries.length === 0) return;
 
-        // Pick the one closest to the top of the viewport (with a 200px offset)
-        const active = visibleEntries.reduce((prev, curr) => {
-          return Math.abs(curr.boundingClientRect.top - 200) < Math.abs(prev.boundingClientRect.top - 200) ? curr : prev;
-        });
+        // Pick the topmost visible section
+        const active = visibleEntries.reduce((prev, curr) =>
+          curr.boundingClientRect.top < prev.boundingClientRect.top ? curr : prev
+        );
 
         if (active && active.target.id !== activeCat) {
           setActiveCat(active.target.id);
         }
       },
-      { rootMargin: "-20% 0px -70% 0px", threshold: [0, 0.2, 1] },
+      { rootMargin: "-10% 0px -75% 0px", threshold: 0 },
     );
-    
-    // Absolute top fallback
+
+    // Snap back to first category when scrolled all the way to the top
     const handleScroll = () => {
       if (window.scrollY < 50 && !isNavigating.current && visibleTopCategories[0]) {
         setActiveCat(visibleTopCategories[0].id);
@@ -139,8 +146,9 @@ function MenuPage() {
 
     Object.values(sectionRefs.current).forEach((el) => el && observer.observe(el));
     window.addEventListener("scroll", handleScroll, { passive: true });
-    
+
     return () => {
+      clearTimeout(settleTimer);
       observer.disconnect();
       window.removeEventListener("scroll", handleScroll);
     };
