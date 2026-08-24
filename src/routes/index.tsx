@@ -48,6 +48,11 @@ function MenuPage() {
     return map;
   }, [data.categories]);
 
+  // Always start at the top — prevents browser scroll restoration from showing wrong category
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  }, []);
+
   // Set initial active category
   useEffect(() => {
     if (!activeCat && topCategories[0]) setActiveCat(topCategories[0].id);
@@ -365,7 +370,7 @@ function MenuPage() {
               ref={(el) => {
                 sectionRefs.current[cat.id] = el;
               }}
-              className="scroll-mt-36 pt-12 pb-12 animate-in fade-in slide-in-from-bottom-8 duration-700"
+              className={`scroll-mt-36 pb-10 animate-in fade-in slide-in-from-bottom-8 duration-700 ${idx === 0 ? "pt-4" : "pt-10"}`}
               style={{ animationDelay: `${idx * 150}ms`, animationFillMode: "both" }}
             >
               <div className="mb-8 text-center sm:text-left">
@@ -467,7 +472,7 @@ function SpecialsCarousel({ items }: { items: MenuItem[] }) {
       </div>
       <div
         ref={trackRef}
-        className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2"
+        className="flex gap-4 overflow-x-auto no-scrollbar snap-x snap-mandatory"
       >
         {items.map((item) => (
           <div
