@@ -332,7 +332,7 @@ function MenuPage() {
       <SpecialsCarousel items={data.items.filter(i => i.isSpecial && i.available !== false)} />
 
       {/* ── Premium Content Grid ── */}
-      <main className="mx-auto max-w-4xl px-4 pb-32 pt-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-4xl px-4 pb-32 pt-3 sm:px-6 lg:px-8">
         {visibleTopCategories.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-muted-foreground animate-in fade-in zoom-in-95 duration-700">
             <ChefHat className="mb-6 h-16 w-16 opacity-20" />
@@ -460,7 +460,7 @@ function SpecialsCarousel({ items }: { items: MenuItem[] }) {
   if (items.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 pt-8">
+    <section className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 pt-4">
       <div className="mb-4 flex items-center gap-3">
         <div className="h-5 w-1 rounded-full bg-primary"></div>
         <h2 className="text-sm font-black uppercase tracking-[0.2em] text-primary">Today's Specials</h2>
