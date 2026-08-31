@@ -441,7 +441,7 @@ function AdminPage() {
       }`}>
         <div className="relative pt-6 pb-4 px-6 flex flex-col items-center">
           <div className="w-full flex justify-center mb-4">
-            <img src="/logo.png" alt="logo" className="w-full h-auto max-w-[160px] object-contain drop-shadow-sm" />
+            <img src="/logo.png?v=2" alt="logo" className="w-full h-auto max-w-[160px] object-contain drop-shadow-sm" />
           </div>
           <div className="text-center">
             <h1 className="font-serif text-lg font-bold tracking-tight text-foreground uppercase">

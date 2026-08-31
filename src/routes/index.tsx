@@ -236,9 +236,9 @@ function MenuPage() {
       {/* ── Logo Hero — pure image wash ── */}
       <header className="relative w-full overflow-hidden">
         <picture>
-          <source srcSet="/logo.png" type="image/png" />
+          <source srcSet="/logo.png?v=2" type="image/png" />
           <img
-            src="/logo.png"
+            src="/logo.png?v=2"
             alt="Fana Kitchen"
             className="w-full object-cover object-top"
             style={{ maxHeight: '80vw', minHeight: '260px' }}
