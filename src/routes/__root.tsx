@@ -42,7 +42,7 @@ export const Route = createRootRoute({
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       // Preload the hero image so it paints immediately (LCP)
-      { rel: "preload", href: "/fanakitchen-logo.webp", as: "image", type: "image/webp" },
+      { rel: "preload", href: "/logo.png", as: "image", type: "image/png" },
       // Load fonts non-blocking: media=print swaps to all once loaded
       {
         rel: "stylesheet",
