@@ -1324,17 +1324,18 @@ export async function savePasscodeCloud(passcode: string) {
 
 // ── Legacy Local Storage ──
 export function loadMenuLocal(): MenuData {
-  if (typeof window === "undefined") return DEFAULT_DATA;
+  const EMPTY_DATA = { categories: [], items: [] };
+  if (typeof window === "undefined") return EMPTY_DATA;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_DATA;
+    if (!raw) return EMPTY_DATA;
     const parsed = JSON.parse(raw) as MenuData;
     return {
       categories: parsed.categories || [],
       items: (parsed.items || []).map(i => ({ ...i, available: i.available !== false, tags: i.tags || [], isSpecial: i.isSpecial === true }))
     };
   } catch {
-    return DEFAULT_DATA;
+    return EMPTY_DATA;
   }
 }
 
@@ -1394,11 +1395,8 @@ export function useMenu(): {
     const saved = localStorage.getItem("sandwich_house_last_sync");
     return saved ? new Date(saved) : null;
   });
-  // Zero-Wait Loading: Don't show loading screen if we have local data already
-  const [isLoading, setIsLoading] = useState(() => {
-    const local = loadMenuLocal();
-    return !(local.categories.length > 0 || local.items.length > 0);
-  });
+  // Always show loading initially to ensure fresh cloud data is fetched before rendering (prevents stale data 'snap')
+  const [isLoading, setIsLoading] = useState(true);
   const [cloudStatus, setCloudStatus] = useState<"online" | "offline" | "connecting">("connecting");
   const isUpdatingRef = useRef(false);
   const pullTimeoutRef = useRef<any>(null);
