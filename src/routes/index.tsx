@@ -117,10 +117,10 @@ function MenuPage() {
   const activeCatRef = useRef(activeCat);
   useEffect(() => { activeCatRef.current = activeCat; }, [activeCat]);
 
+  const [isPillInitialized, setIsPillInitialized] = useState(false);
+
   // Handle active category updates from scrolling
   useEffect(() => {
-    // Give the page 600ms to settle before the observer starts overriding activeCat.
-    // This prevents the first-load race where all sections fire at once.
     let settled = false;
     const settleTimer = setTimeout(() => { settled = true; }, 600);
 
@@ -132,7 +132,7 @@ function MenuPage() {
         const visibleEntries = entries.filter((e) => e.isIntersecting);
         if (visibleEntries.length === 0) return;
 
-        // Pick the topmost visible section
+        // If multiple sections are intersecting the tripwire, pick the one that is highest up (lowest top value)
         const active = visibleEntries.reduce((prev, curr) =>
           curr.boundingClientRect.top < prev.boundingClientRect.top ? curr : prev
         );
@@ -141,10 +141,10 @@ function MenuPage() {
           setActiveCat(active.target.id);
         }
       },
-      { rootMargin: "-10% 0px -75% 0px", threshold: 0 },
+      // Create a thin horizontal "tripwire" just below the sticky nav (around 150px from top)
+      { rootMargin: "-150px 0px -70% 0px", threshold: 0 },
     );
 
-    // Snap back to first category when scrolled all the way to the top
     const handleScroll = () => {
       if (window.scrollY < 50 && !isNavigating.current && visibleTopCategories[0]) {
         setActiveCat(visibleTopCategories[0].id);
@@ -159,11 +159,10 @@ function MenuPage() {
       observer.disconnect();
       window.removeEventListener("scroll", handleScroll);
     };
-  // ↓ activeCat intentionally excluded — we use activeCatRef instead
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleTopCategories]);
 
-  // Butter-Smooth Horizontal Pill Motion (Hardware Accelerated)
+  // Butter-Smooth Horizontal Pill Motion
   useLayoutEffect(() => {
     if (!activeCat) return;
 
@@ -177,15 +176,20 @@ function MenuPage() {
           left: activeItem.offsetLeft,
           opacity: 1
         });
+        // After first update, enable transitions for future moves
+        if (!isPillInitialized) {
+          requestAnimationFrame(() => {
+            setIsPillInitialized(true);
+          });
+        }
       };
 
       updatePill();
       
-      // Auto-scroll the nav container
       const scrollLeft = activeItem.offsetLeft - navContainer.offsetWidth / 2 + activeItem.offsetWidth / 2;
       navContainer.scrollTo({
         left: scrollLeft,
-        behavior: "smooth",
+        behavior: isPillInitialized ? "smooth" : "instant",
       });
 
       window.addEventListener('resize', updatePill);
@@ -297,7 +301,7 @@ function MenuPage() {
               >
                 {/* Hardware Accelerated Sliding Pill Background */}
                 <div 
-                  className="absolute left-0 top-3 bottom-0 h-10 rounded-full bg-primary shadow-md shadow-primary/30 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
+                  className={`absolute left-0 top-3 bottom-0 h-10 rounded-full bg-primary shadow-md shadow-primary/30 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isPillInitialized ? 'transition-all duration-300' : ''}`}
                   style={{
                     width: `${pillStyle.width}px`,
                     transform: `translate3d(${pillStyle.left}px, 0, 0)`,
