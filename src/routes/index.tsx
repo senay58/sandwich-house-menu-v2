@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMenu, formatPrice, type MenuItem } from "@/lib/menu-store";
 import { Leaf, Flame, Sparkles, ChefHat, Search, X, Wheat, Utensils } from "lucide-react";
 
@@ -50,7 +50,7 @@ function MenuPage() {
 
   // Always start at the top — prevents browser scroll restoration from showing wrong category
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+    window.scrollTo(0, 0); // plain form works on all browsers including iOS Safari
   }, []);
 
   // Set initial active category
@@ -117,31 +117,34 @@ function MenuPage() {
   const activeCatRef = useRef(activeCat);
   useEffect(() => { activeCatRef.current = activeCat; }, [activeCat]);
 
-  const [isPillInitialized, setIsPillInitialized] = useState(false);
+  // Tracks whether the pill has been positioned at least once (ref = no extra re-renders)
+  const isPillReady = useRef(false);
 
   // Handle active category updates from scrolling
   useEffect(() => {
     let settled = false;
     const settleTimer = setTimeout(() => { settled = true; }, 600);
+    let pendingFrame: number | null = null; // throttle: one update per animation frame
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (!settled) return;
         if (isNavigating.current) return;
+        if (pendingFrame) return; // drop update if one is already scheduled
 
-        const visibleEntries = entries.filter((e) => e.isIntersecting);
-        if (visibleEntries.length === 0) return;
+        pendingFrame = requestAnimationFrame(() => {
+          pendingFrame = null;
+          const visibleEntries = entries.filter((e) => e.isIntersecting);
+          if (visibleEntries.length === 0) return;
 
-        // If multiple sections are intersecting the tripwire, pick the one that is highest up (lowest top value)
-        const active = visibleEntries.reduce((prev, curr) =>
-          curr.boundingClientRect.top < prev.boundingClientRect.top ? curr : prev
-        );
-
-        if (active && active.target.id !== activeCatRef.current) {
-          setActiveCat(active.target.id);
-        }
+          const active = visibleEntries.reduce((prev, curr) =>
+            curr.boundingClientRect.top < prev.boundingClientRect.top ? curr : prev
+          );
+          if (active && active.target.id !== activeCatRef.current) {
+            setActiveCat(active.target.id);
+          }
+        });
       },
-      // Create a thin horizontal "tripwire" just below the sticky nav (around 150px from top)
       { rootMargin: "-150px 0px -70% 0px", threshold: 0 },
     );
 
@@ -156,45 +159,55 @@ function MenuPage() {
 
     return () => {
       clearTimeout(settleTimer);
+      if (pendingFrame) cancelAnimationFrame(pendingFrame);
       observer.disconnect();
       window.removeEventListener("scroll", handleScroll);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleTopCategories]);
 
-  // Butter-Smooth Horizontal Pill Motion
-  useLayoutEffect(() => {
+  // Nav Pill positioning — useEffect (not layout) to avoid blocking iOS Safari paint
+  useEffect(() => {
     if (!activeCat) return;
 
     const navContainer = navScrollRef.current;
     const activeItem = navItemRefs.current[activeCat];
+    if (!activeItem || !navContainer) return;
 
-    if (activeItem && navContainer) {
-      const updatePill = () => {
-        setPillStyle({
-          width: activeItem.offsetWidth,
-          left: activeItem.offsetLeft,
-          opacity: 1
-        });
-        // After first update, enable transitions for future moves
-        if (!isPillInitialized) {
-          requestAnimationFrame(() => {
-            setIsPillInitialized(true);
-          });
+    const width = activeItem.offsetWidth;
+    const left = activeItem.offsetLeft;
+    const isFirst = !isPillReady.current;
+
+    // Update pill position
+    setPillStyle({ width, left, opacity: 1 });
+
+    // Scroll nav bar to center the active pill
+    // Use direct .scrollLeft assignment for instant (iOS Safari doesn't support behavior:'instant')
+    const targetScrollLeft = left - navContainer.offsetWidth / 2 + width / 2;
+    if (isFirst) {
+      // First time: jump instantly, mark as ready
+      navContainer.scrollLeft = targetScrollLeft;
+      isPillReady.current = true;
+    } else {
+      // Subsequent times: smooth scroll inside rAF to avoid layout thrashing
+      requestAnimationFrame(() => {
+        try {
+          navContainer.scrollTo({ left: targetScrollLeft, behavior: "smooth" });
+        } catch {
+          navContainer.scrollLeft = targetScrollLeft;
         }
-      };
-
-      updatePill();
-      
-      const scrollLeft = activeItem.offsetLeft - navContainer.offsetWidth / 2 + activeItem.offsetWidth / 2;
-      navContainer.scrollTo({
-        left: scrollLeft,
-        behavior: isPillInitialized ? "smooth" : "instant",
       });
-
-      window.addEventListener('resize', updatePill);
-      return () => window.removeEventListener('resize', updatePill);
     }
+
+    const handleResize = () => {
+      setPillStyle({
+        width: activeItem.offsetWidth,
+        left: activeItem.offsetLeft,
+        opacity: 1,
+      });
+    };
+    window.addEventListener("resize", handleResize, { passive: true });
+    return () => window.removeEventListener("resize", handleResize);
   }, [activeCat]);
 
   const scrollTo = (id: string, offset = 120) => {
@@ -299,9 +312,9 @@ function MenuPage() {
                 ref={navScrollRef}
                 className="flex gap-2 overflow-x-auto px-4 py-3 no-scrollbar sm:justify-center relative scroll-smooth"
               >
-                {/* Hardware Accelerated Sliding Pill Background */}
+                {/* Sliding Pill Background */}
                 <div 
-                  className={`absolute left-0 top-3 bottom-0 h-10 rounded-full bg-primary shadow-md shadow-primary/30 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isPillInitialized ? 'transition-all duration-300' : ''}`}
+                  className="absolute left-0 top-3 bottom-0 h-10 rounded-full bg-primary shadow-md shadow-primary/30 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
                   style={{
                     width: `${pillStyle.width}px`,
                     transform: `translate3d(${pillStyle.left}px, 0, 0)`,
