@@ -28,7 +28,6 @@ function MenuPage() {
   const navScrollRef = useRef<HTMLUListElement>(null);
   const navItemRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
-  const [pillStyle, setPillStyle] = useState({ width: 0, left: 0, opacity: 0 });
   const isNavigating = useRef(false);
   const scrollTimeout = useRef<any>(null);
 
@@ -113,101 +112,74 @@ function MenuPage() {
     });
   }, [topCategories, itemsByCat, subCategoriesByParent]);
 
-  // Keep a ref so the observer can read the latest activeCat without it being a dep
+  // Keep a ref so the scroll listener can read the latest activeCat without being a dep
   const activeCatRef = useRef(activeCat);
   useEffect(() => { activeCatRef.current = activeCat; }, [activeCat]);
 
-  // Tracks whether the pill has been positioned at least once (ref = no extra re-renders)
-  const isPillReady = useRef(false);
-
-  // Handle active category updates from scrolling
+  // Rock-solid scroll spy: smoothly tracks active category without lag, jitter, or iOS WebKit crashes
   useEffect(() => {
-    let settled = false;
-    const settleTimer = setTimeout(() => { settled = true; }, 600);
-    let pendingFrame: number | null = null; // throttle: one update per animation frame
+    let ticking = false;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!settled) return;
-        if (isNavigating.current) return;
-        if (pendingFrame) return; // drop update if one is already scheduled
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
 
-        pendingFrame = requestAnimationFrame(() => {
-          pendingFrame = null;
-          const visibleEntries = entries.filter((e) => e.isIntersecting);
-          if (visibleEntries.length === 0) return;
-
-          const active = visibleEntries.reduce((prev, curr) =>
-            curr.boundingClientRect.top < prev.boundingClientRect.top ? curr : prev
-          );
-          if (active && active.target.id !== activeCatRef.current) {
-            setActiveCat(active.target.id);
-          }
-        });
-      },
-      { rootMargin: "-150px 0px -70% 0px", threshold: 0 },
-    );
-
-    const handleScroll = () => {
-      if (window.scrollY < 50 && !isNavigating.current && visibleTopCategories[0]) {
-        setActiveCat(visibleTopCategories[0].id);
-      }
-    };
-
-    Object.values(sectionRefs.current).forEach((el) => el && observer.observe(el));
-    window.addEventListener("scroll", handleScroll, { passive: true });
-
-    return () => {
-      clearTimeout(settleTimer);
-      if (pendingFrame) cancelAnimationFrame(pendingFrame);
-      observer.disconnect();
-      window.removeEventListener("scroll", handleScroll);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleTopCategories]);
-
-  // Nav Pill positioning — useEffect (not layout) to avoid blocking iOS Safari paint
-  useEffect(() => {
-    if (!activeCat) return;
-
-    const navContainer = navScrollRef.current;
-    const activeItem = navItemRefs.current[activeCat];
-    if (!activeItem || !navContainer) return;
-
-    const width = activeItem.offsetWidth;
-    const left = activeItem.offsetLeft;
-    const isFirst = !isPillReady.current;
-
-    // Update pill position
-    setPillStyle({ width, left, opacity: 1 });
-
-    // Scroll nav bar to center the active pill
-    // Use direct .scrollLeft assignment for instant (iOS Safari doesn't support behavior:'instant')
-    const targetScrollLeft = left - navContainer.offsetWidth / 2 + width / 2;
-    if (isFirst) {
-      // First time: jump instantly, mark as ready
-      navContainer.scrollLeft = targetScrollLeft;
-      isPillReady.current = true;
-    } else {
-      // Subsequent times: smooth scroll inside rAF to avoid layout thrashing
       requestAnimationFrame(() => {
-        try {
-          navContainer.scrollTo({ left: targetScrollLeft, behavior: "smooth" });
-        } catch {
-          navContainer.scrollLeft = targetScrollLeft;
+        ticking = false;
+        if (isNavigating.current) return;
+
+        // If at top of page, select the first visible category
+        if (window.scrollY < 120 && visibleTopCategories[0]) {
+          if (activeCatRef.current !== visibleTopCategories[0].id) {
+            setActiveCat(visibleTopCategories[0].id);
+          }
+          return;
+        }
+
+        const offset = 180; // Detection line just below the sticky nav
+        let currentId = visibleTopCategories[0]?.id || null;
+
+        for (const cat of visibleTopCategories) {
+          const el = sectionRefs.current[cat.id];
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            if (rect.top <= offset) {
+              currentId = cat.id;
+            }
+          }
+        }
+
+        if (currentId && currentId !== activeCatRef.current) {
+          setActiveCat(currentId);
         }
       });
-    }
-
-    const handleResize = () => {
-      setPillStyle({
-        width: activeItem.offsetWidth,
-        left: activeItem.offsetLeft,
-        opacity: 1,
-      });
     };
-    window.addEventListener("resize", handleResize, { passive: true });
-    return () => window.removeEventListener("resize", handleResize);
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [visibleTopCategories]);
+
+  // Keep active category pill visible in the horizontal nav bar
+  useEffect(() => {
+    if (!activeCat) return;
+    const activeBtn = navItemRefs.current[activeCat];
+    const container = navScrollRef.current;
+    if (!activeBtn || !container) return;
+
+    const containerLeft = container.scrollLeft;
+    const containerRight = containerLeft + container.clientWidth;
+    const btnLeft = activeBtn.offsetLeft;
+    const btnRight = btnLeft + activeBtn.clientWidth;
+
+    // Only scroll if the active pill is near or outside the edge
+    if (btnLeft < containerLeft + 32 || btnRight > containerRight - 32) {
+      const target = Math.max(0, btnLeft - (container.clientWidth - activeBtn.clientWidth) / 2);
+      try {
+        container.scrollTo({ left: target, behavior: "smooth" });
+      } catch {
+        container.scrollLeft = target;
+      }
+    }
   }, [activeCat]);
 
   const scrollTo = (id: string, offset = 120) => {
@@ -241,15 +213,6 @@ function MenuPage() {
   return (
     <div className="relative min-h-screen bg-background text-foreground font-sans overflow-clip">
       
-      {/* ── Background Gradients ── */}
-      {/* These will create subtle, blurred dark green blobs over the white background */}
-      <div className="pointer-events-none fixed top-0 left-0 -z-10 h-full w-full">
-        <div className="absolute top-[-10%] left-[-10%] h-[40vh] w-[40vw] rounded-full bg-primary/5 blur-[120px]"></div>
-
-        <div className="absolute top-[30%] right-[-10%] h-[50vh] w-[40vw] rounded-full bg-accent/5 blur-[150px]"></div>
-        <div className="absolute bottom-[-10%] left-[20%] h-[40vh] w-[40vw] rounded-full bg-primary/5 blur-[120px]"></div>
-      </div>
-
       {/* ── Logo Hero — pure image wash ── */}
       <header className="relative w-full overflow-hidden">
         <picture>
@@ -270,7 +233,7 @@ function MenuPage() {
       {/* ── Sticky Search & Navigation Wrapper ── */}
       <div className="sticky top-0 z-[100] w-full">
         {/* Search Bar */}
-        <div className="w-full border-b border-border/20 bg-background/80 backdrop-blur-xl transition-all">
+        <div className="w-full border-b border-border/20 bg-background/95 backdrop-blur-md transition-all">
           <div className="mx-auto max-w-4xl px-4 py-3 flex gap-2">
             <div className="relative group flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
@@ -306,37 +269,26 @@ function MenuPage() {
 
         {/* Categories Nav */}
         {!searchQuery && (
-          <nav className="w-full border-b border-border/40 bg-background/60 backdrop-blur-xl shadow-sm transition-all border-t border-border/10">
+          <nav className="w-full border-b border-border/40 bg-background/95 backdrop-blur-md shadow-sm transition-all border-t border-border/10">
             <div className="mx-auto max-w-4xl relative">
               <ul 
                 ref={navScrollRef}
                 className="flex gap-2 overflow-x-auto px-4 py-3 no-scrollbar sm:justify-center relative scroll-smooth"
               >
-                {/* Sliding Pill Background */}
-                <div 
-                  className="absolute left-0 top-3 bottom-0 h-10 rounded-full bg-primary shadow-md shadow-primary/30 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
-                  style={{
-                    width: `${pillStyle.width}px`,
-                    transform: `translate3d(${pillStyle.left}px, 0, 0)`,
-                    opacity: pillStyle.opacity,
-                    zIndex: 0,
-                  }}
-                />
-                
                 {visibleTopCategories.map((c) => {
                   const isActive = activeCat === c.id;
                   return (
                     <li 
                       key={c.id} 
                       ref={(el) => { navItemRefs.current[c.id] = el; }}
-                      className="relative z-10"
+                      className="shrink-0"
                     >
                       <button
                         onClick={() => scrollTo(c.id)}
-                        className={`relative z-20 whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-bold transition-all duration-300 ${
+                        className={`whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-bold transition-all duration-200 ${
                           isActive
-                            ? "text-primary-foreground scale-[1.02]"
-                            : "text-foreground/80 hover:text-foreground"
+                            ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 scale-[1.02]"
+                            : "bg-secondary/40 text-foreground/75 hover:bg-secondary/70 hover:text-foreground"
                         }`}
                       >
                         {c.name}
@@ -407,7 +359,7 @@ function MenuPage() {
                       <button
                         key={`nav-${sub.id}`}
                         onClick={() => scrollTo(sub.id, 140)}
-                        className="rounded-full border border-border/80 bg-card/60 backdrop-blur-sm px-4 py-1.5 text-sm font-semibold text-foreground/80 hover:border-primary hover:text-primary transition-all shadow-sm hover:shadow active:scale-95"
+                        className="rounded-full border border-border/80 bg-card px-4 py-1.5 text-sm font-semibold text-foreground/80 hover:border-primary hover:text-primary transition-all shadow-sm hover:shadow active:scale-95"
                       >
                         {sub.name}
                       </button>
@@ -530,10 +482,10 @@ function ItemList({ items }: { items: MenuItem[] }) {
         const isFasting = hasTag("Fasting");
 
         const PriceBadge = ({ price, inverted }: { price: number, inverted?: boolean }) => (
-          <div className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 backdrop-blur-md shadow-lg border ${
+          <div className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 shadow-md border ${
             inverted 
               ? "bg-primary/10 border-primary/20" 
-              : "bg-white/90 border-white/20"
+              : "bg-white/95 border-black/5"
           }`}>
              <span className={`text-[10px] font-black ${inverted ? "text-primary/60" : "text-primary opacity-60"}`}>ETB</span>
              <span className={`text-sm font-black ${inverted ? "text-primary" : "text-foreground"}`}>{price.toLocaleString("en-ET")}</span>
@@ -543,7 +495,7 @@ function ItemList({ items }: { items: MenuItem[] }) {
         return (
           <li
             key={item.id}
-            className="group relative flex flex-col overflow-hidden rounded-[2.5rem] border border-primary/10 bg-gradient-to-br from-white/60 via-white/40 to-primary/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-500 hover:-translate-y-2 hover:border-primary/40 hover:shadow-[0_20px_40px_-15px_rgba(40,120,80,0.15)]"
+            className="group relative flex flex-col overflow-hidden rounded-[2.5rem] border border-primary/10 bg-white shadow-[0_4px_20px_rgb(0,0,0,0.03)] transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_12px_30px_-10px_rgba(40,120,80,0.15)]"
           >
             {/* Image Section - Only if exists */}
             {item.image && (
